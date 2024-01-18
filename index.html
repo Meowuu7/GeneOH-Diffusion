@@ -1,0 +1,728 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="description"
+        content="GeneOH Diffusion">
+  <meta name="keywords" content="Hand-object iteractions; Motion refinement; Inverse problems; Generative priors; Diffusion models">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta property="og:type" content="video.other" />
+  <title>GeneOH Diffusion</title>
+
+  <link href="https://fonts.googleapis.com/css?family=Google+Sans|Noto+Sans|Castoro"
+        rel="stylesheet">
+
+  <link rel="stylesheet" href="./static/css/bulma.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-carousel.min.css">
+  <link rel="stylesheet" href="./static/css/bulma-slider.min.css">
+  <link rel="stylesheet" href="./static/css/fontawesome.all.min.css">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1/css/academicons.min.css">
+  <link rel="stylesheet" href="./static/css/index.css">
+  <!-- <link rel="stylesheet" href="./static/css/styles.css"> -->
+  <link rel="icon" href="./static/images/icon-geneoh-diffusion-carton-2.png">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script defer src="./static/js/fontawesome.all.min.js"></script>
+  <script src="./static/js/bulma-carousel.min.js"></script>
+  <script src="./static/js/bulma-slider.min.js"></script>
+  <script src="./static/js/index.js"></script>
+  <script src="assets/js/video_comparison.js"></script>
+
+  <script src="https://polyfill.io/v3/polyfill.js?features=IntersectionObserver"></script>
+  <!-- <script src="./static/js/yall.js"></script> -->
+  <script>
+      yall(
+          {
+              observeChanges: true
+          }
+      );
+  </script>
+  <!-- <script src="./static/js/scripts.js"></script> -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.bundle.min.js"></script>
+  <script src="https://uploads-ssl.webflow.com/51e0d73d83d06baa7a00000f/js/webflow.fd002feec.js"></script>
+  <script type="module" src="https://unpkg.com/@google/model-viewer@2.0.1/dist/model-viewer.min.js"></script>
+</head>
+<body>
+
+<div>
+    <!-- <video id="teaser" class="item" poster="static/images/teaser.jpg"  autoplay muted loop height="100%">
+            <source src="static/videos-lowres/teaser-13.mp4"
+            type="video/mp4"> </source>
+    </video> -->
+    <video id="teaser" class="lazy" poster="static/images/teaser.jpg"  autoplay muted loop height="100%">
+      <source data-src="static/videos-lowres/teaser-13.mp4"
+      type="video/mp4"> </source>
+    </video>
+  <h2 class="subtitle has-text-centered">
+    <span style="color: orange; font-weight:bold">Gene</span><span style="color: rgb(96, 158, 240); font-weight:bold">OH</span>
+        <span style="color: rgb(246, 105, 190); font-weight:bold">Diffusion</span>  cleans erroneous <span style="color: rgb(246, 105, 190); font-weight:bold">out-of-domain</span> HOI tracks with <span style="color: rgb(96, 158, 240); font-weight:bold">new objects, motions, and novel noise distributions</span> into natural sequences by only training on limited data. 
+  </h2>
+  <!-- GeneOH Diffusion cleans erroneous out-of-domain HOI tracks with new objects, motions, and novel noise distributions into natural sequences by only training on limited data.  -->
+  <!-- <script>
+    document.addEventListener("DOMContentLoaded", function() {
+      var lazyVideos = [].slice.call(document.querySelectorAll("video.lazy"));
+      if ("IntersectionObserver" in window) {
+        var lazyVideoObserver = new IntersectionObserver(function(entries, observer) {
+          entries.forEach(function(video) {
+            if (video.isIntersecting) {
+              for (var source in video.target.children) {
+                var videoSource = video.target.children[source];
+                if (typeof videoSource.tagName === "string" && videoSource.tagName === "SOURCE") {
+                  videoSource.src = videoSource.dataset.src;
+                }
+              }
+              video.target.load();
+              video.target.classList.remove("lazy");
+              lazyVideoObserver.unobserve(video.target);
+            }
+          });
+        });
+        lazyVideos.forEach(function(lazyVideo) {
+          lazyVideoObserver.observe(lazyVideo);
+        });
+      }
+    });
+  </script> -->
+  <!-- <script>
+    console.log("Hiii")
+    function isElementInViewport (el) 
+    {
+      var rect = el.getBoundingClientRect();
+
+      return (
+        rect.top >= 0 &&
+        rect.left >= 0 &&
+        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) && 
+        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
+      );
+    }
+
+    const handler = () => 
+    {
+      const videos = document.querySelectorAll('video');
+      for (let i = 0; i < videos.length; i++)
+      {
+        const video = videos[i];
+        const visible = isElementInViewport(video); // Check if the video is in the viewport or not.
+        if (visible)
+        {
+          const dataSrc = video.querySelector('data-src');
+          if (dataSrc) // Check if data-src exists or not. If yes, than we have never loaded this video.
+          {
+            // Creating souce element and adding respective attributes.
+            const source = document.createElement('source');
+            source.src = dataSrc.getAttribute('src');
+            source.type = dataSrc.getAttribute('type');
+
+            video.appendChild(source); // Add new source element to video.
+            video.removeChild(dataSrc); // Remove data-src from video. 
+          }
+        }
+      } 
+    }
+    addEventListener('load', handler, false);
+    addEventListener('scroll', handler, false);
+    addEventListener('resize', handler, false);
+
+  </script> -->
+  <br>
+  <br>
+  <br>
+</div>
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">
+            <img src="./static/images/icon-geneoh-diffusion-carton-2.png" alt="logo" style="width: 78px; height: 78px; margin-right: -0px; margin-bottom: -8px;">
+            <span style="color: orange; font-weight:bold">Gene</span><span style="color: rgb(96, 158, 240); font-weight:bold">OH</span>
+            <span style="color: rgb(246, 105, 190); font-weight:bold">Diffusion</span>
+          </h1>
+          <h2 class="title is-1 publication-title">
+            Towards <span style="color: orange; font-weight:bold">Gene</span>ralizable <span style="color: rgb(96, 158, 240); font-weight:bold">H</span>and-<span style="color: rgb(96, 158, 240); font-weight:bold">O</span>bject Interaction Denoising via Denoising <span style="color: rgb(246, 105, 190); font-weight:bold">Diffusion</span>
+          </h2>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">
+              Anonymous Author(s)
+            </span>
+          </div>
+          <div class="is-size-5 publication-authors">
+            <span style="font-weight:bold">In submission to ICLR 2024 (Paper ID 292)</span>
+          </div>
+
+          <div class="column has-text-centered">
+            <div class="publication-links">
+              <span class="link-block">
+                <a href="./static/pdfs/GeneOH_Diffusion.pdf"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fas fa-file-pdf"></i>
+                  </span>
+                  <span>Paper</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="./static/videos/video-2.mp4"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <i class="fab fa-youtube"></i>
+                  </span>
+                  <span>Video</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="./static/others/supp-web.zip"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <!-- <i class="fas fa-file-pdf"></i> -->
+                      <i class="fa fa-database" aria-hidden="true"></i>
+                  </span>
+                  <span>Supp</span>
+                </a>
+              </span>
+              <span class="link-block">
+                <a href="./static/others/highres-figs.zip"
+                   class="external-link button is-normal is-rounded is-dark">
+                  <span class="icon">
+                      <!-- <i class="fas fa-file-pdf"></i> -->
+                      <i class="fa fa-database" aria-hidden="true"></i>
+                  </span>
+                  <span>HighRes Figs</span>
+                </a>
+              </span>
+            </div>
+
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+
+<!-- <section class="hero teaser">
+  <div class="container is-max-desktop">
+    <div class="hero-body">
+      <video id="teaser" class="item" poster="static/images/teaser.jpg"  autoplay muted loop height="100%">
+        <source src="static/videos-lowres/teaser-13.mp4"
+                type="video/mp4">
+      </video>
+      <h2 class="subtitle has-text-centered">
+        <span style="color: orange; font-weight:bold">Gene</span><span style="color: rgb(96, 158, 240); font-weight:bold">OH</span>
+            <span style="color: rgb(246, 105, 190); font-weight:bold">Diffusion</span>  cleans  <span style="color: rgb(246, 105, 190); font-weight:bold">out-of-domain</span>  erroneous HOI tracks with <span style="color: rgb(96, 158, 240); font-weight:bold">new objects, motions, and novel noise distributions</span> into natural sequences by only training on limited data. 
+      </h2>
+    </div>
+  </div>
+</section> -->
+
+<section class="hero is-light is-small">
+  <div class="hero-body">
+    <div class="container">
+      <div id="results-carousel" class="carousel results-carousel">
+        <div class="item item-fullbody">
+          <video poster="" id="fullbody" class="lazy"  autoplay playsinline controls muted loop height="10%">
+            <source data-src="static/videos-lowres/ours-toothpaste-3.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-shiba">
+          <video poster="" id="scissors" class="lazy"  autoplay playsinline controls muted loop height="10%">
+            <source data-src="static/videos-lowres/ours-open-scissor-2.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-shiba">
+          <video poster="" id="scissors" class="lazy"  autoplay playsinline controls muted loop height="10%">
+            <source data-src="static/videos-lowres/ours-open-box.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-shiba">
+          <video poster="" id="scissors" class="lazy"  autoplay playsinline controls muted loop height="10%">
+            <source data-src="static/videos-lowres/ours-use-capsule-machine.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-shiba">
+          <video poster="" id="shiba" class="lazy"  autoplay playsinline controls muted loop height="100%">
+            <source data-src="static/videos-lowres/ours-manip-mug-2.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-toby">
+          <video poster="" id="toby" class="lazy"  autoplay playsinline controls muted loop height="100%">
+            <source data-src="static/videos-lowres/ours-manip-wineglass-4.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-chair-tp">
+          <video poster="" id="chair-tp" class="lazy"  autoplay playsinline controls muted loop height="100%">
+            <source data-src="static/videos-lowres/ours-flip-toothpaste-4.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-toby">
+          <video poster="" id="camera" class="lazy"  autoplay playsinline controls muted loop height="100%">
+            <source data-src="static/videos-lowres/ours-manip-camera.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <div class="item item-toby">
+          <video poster="" id="bowl" class="lazy"  autoplay playsinline controls muted loop height="100%">
+            <source data-src="static/videos-lowres/ours-rotate-bowl-2.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+        <!-- use_laptop_seq_13 -->
+        <div class="item item-toby">
+          <video poster="" id="bowl" class="lazy"  autoplay playsinline controls muted loop height="100%">
+            <source data-src="static/videos-lowres/use_laptop_seq_13.mp4"
+                    type="video/mp4">
+          </video>
+        </div>
+      </div>
+      <!-- <h2 class="subtitle has-text-centered">
+        <span style="color: orange; font-weight:bold">Gene</span><span style="color: rgb(96, 158, 240); font-weight:bold">OH</span>
+            <span style="color: rgb(246, 105, 190); font-weight:bold">Diffusion</span>  cleans noisy <span style="color: rgb(246, 105, 190); font-weight:bold">out-of-domain</span> HOI tracks with errors involving <span style="color: rgb(96, 158, 240); font-weight:bold">new objects, motions, and novel noise distributions</span> into natural sequences by only training on limited data. 
+      </h2> -->
+    </div>
+  </div>
+</section>
+
+
+<section class="section">
+  <div class="container is-max-desktop">
+    <!-- Abstract. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">Abstract</span></h2>
+        <div class="content has-text-justified">
+          <p>
+            In this work, we tackle the challenging problem of denoising hand-object interactions (HOI). Given an erroneous interaction sequence, the objective is to refine the incorrect hand trajectory to remove interaction artifacts for a perceptually realistic sequence.  This challenge involves intricate interaction noise, including unnatural hand poses and incorrect hand-object relations, alongside the necessity for robust generalization to new interactions and diverse noise patterns. We tackle those challenges through a novel approach, <span style="color: orange; font-weight:bold">Gene</span><span style="color: rgb(96, 158, 240); font-weight:bold">OH</span>
+            <span style="color: rgb(246, 105, 190); font-weight:bold">Diffusion</span> , incorporating two key designs: an innovative contact-centric HOI representation named GeneOH and a new domain-generalizable denoising scheme. The  <span style="color: rgb(146, 53, 238); font-weight:bold">contact-centric representation GeneOH</span> informatively parameterizes the HOI process, facilitating enhanced generalization across various HOI scenarios. The new denoising scheme consists of a <span style="color: rgb(40, 118, 14); font-weight:bold">canonical denoising model</span> trained to project noisy data samples from a whitened noise space to a clean data manifold and a <span style="color: rgb(40, 118, 14); font-weight:bold">"denoising via diffusion"</span> strategy which can handle input trajectories with various noise patterns by first diffusing them to align with the whitened noise space and cleaning via the canonical denoiser. Extensive experiments on four benchmarks with significant domain variations demonstrate the superior effectiveness of our method. GeneOH Diffusion also shows promise for various downstream applications. 
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Paper video. -->
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">Video</span></h2>
+        <div class="publication-video">
+          <video class="lazy" controls muted height="100%">
+                    <source data-src="static/videos/video-2.mp4"
+                    type="video/mp4"> </source>
+          </video>
+        </div>
+        
+        
+
+      </div>
+    </div>
+  </div>
+</section>
+
+
+
+<section>
+  <div class="container is-max-widescreen is-centered has-text-centered">
+    <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">GRAB test set</span> 
+      <!-- <span style="color: orange; font-weight:bold">(novel interactions with new objects)</span> -->
+    </h2>
+      <p>
+        <span style="font-weight:bold">Challenges:</span> <span style="color: orange; font-weight:bold">novel interactions with new objects.</span>
+      </p>
+    <!-- <h2 class="title is-3"></h2> -->
+      <!-- <h3 class="title is-4">Grasp a toothpaste</h3> -->
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+          <!-- <source src="static/videos-lowres/grab-toothpaste.mp4" type="video/mp4"> -->
+          <!-- grab-grasp-toothpaste-5 -->
+          <!-- <source src="static/videos-lowres/grab-grasp-toothpaste-5.mp4" type="video/mp4"> -->
+          <!-- <source src="static/videos-lowres/grab-res-all.mp4" type="video/mp4"> -->
+          <!-- grab-res-1-block -->
+          <source data-src="static/videos-lowres/grab-res-1-block-3.mp4" type="video/mp4">
+        </video>
+        
+      <!-- <p>
+        Grasp a toothpaste
+      </p> -->
+      <!-- <h2 class="subtitle has-text-centered">
+        Grasp a toothpaste
+      </h2> -->
+
+      <!-- <details>
+        <summary class="title is-6 button">Click here for more examples on Eyeglasses</summary>
+        <video autoplay muted loop playsinline width="100%">
+          <source src="figs/res-eyeglasses.mp4" type="video/mp4">
+        </video>
+      </details> -->
+
+      <!-- <h3 class="title is-4">Manipulate the mug (<span style="color: rgb(240, 100, 212); font-weight:bold">difficult geometry -- thin handle</span>)</h3> -->
+        
+      <br><br>
+      <details>
+        <summary onclick="change_grab()" id="showMoreBtn_grab"  class="title is-6 button" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">More results</summary>
+        <br><br>
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+          <!-- <source src="static/videos-lowres/grab-mug.mp4" type="video/mp4"> -->
+          <!-- grab-grasp-mug-4 -->
+          <!-- <source src="static/videos-lowres/grab-grasp-mug-4.mp4" type="video/mp4"> -->
+          <source data-src="static/videos-lowres/grab-res-2-block-3.mp4" type="video/mp4">
+        </video>
+        <!-- <h2 class="subtitle has-text-centered">
+          Manipulate the mug (<span style="color: rgb(240, 100, 212); font-weight:bold">difficult geometry -- thin handle</span>)
+        </h2>
+        <br><br> -->
+      <!-- <h3 class="title is-4">Manipulate a toothpaste (<span style="color: rgb(240, 100, 212); font-weight:bold">in-hand manipulations and changing contacts</span>)</h3> -->
+      <!-- grab-manip-toothpaste-4 -->
+        <!-- <video autoplay muted loop playsinline width="80%">
+          <source src="static/videos-lowres/grab-manip-toothpaste-4.mp4" type="video/mp4">
+        </video> -->
+      <!-- <h2 class="subtitle has-text-centered">
+        Manipulate a toothpaste (<span style="color: rgb(240, 100, 212); font-weight:bold">in-hand manipulations and changing contacts</span>)
+      </h2> -->
+    </details>
+
+
+      <br>
+      <br>
+    <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">GRAB (Beta) test set</span> 
+      <!-- <span style="color: orange; font-weight:bold">(unseen synthetic noise patterns)</span> -->
+      <!-- Results on the <span style="color: rgb(79, 151, 238); font-weight:bold">GRAB (Beta)</span> test set -- with <span style="color: rgb(240, 100, 212); font-weight:bold">unseen synthetic noise patterns</span> -->
+    </h2>
+      <p>
+        <span style="font-weight:bold">Challenges:</span> 1)  <span style="color: orange; font-weight:bold">novel interactions with new objects,</span> 2) <span style="color: orange; font-weight:bold">unseen synthetic noise patterns.</span>
+      </p>
+      <!-- <h3 class="title is-4">Manipulate the mug (<span style="color: rgb(240, 100, 212); font-weight:bold">difficult geometry -- thin handle</span>)</h3> -->
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+            <!--  -->
+          <!-- </video> -->
+          <!-- <source src="static/videos-lowres/grab-beta-mug.mp4" type="video/mp4"> -->
+          <!-- grab-beta-rotate-mug-4 -->
+          <!-- <source src="static/videos-lowres/grab-beta-rotate-mug-4.mp4" type="video/mp4"> -->
+          <source data-src="static/videos-lowres/grab-beta-res-1-block-3.mp4" type="video/mp4">
+        </video>
+        <br><br>
+        <details>
+          <summary onclick="change_grabbeta()" id="showMoreBtn_grabbeta" class="title is-6 button" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">More results</summary>
+          <br><br>
+          <!-- <video autoplay muted loop playsinline width="100%"> -->
+        <video class="lazy" muted loop playsinline width="100%">
+            <source data-src="static/videos-lowres/grab-beta-res-2-block-3.mp4" type="video/mp4">
+        </video>
+        </details>
+      <br>
+      <br>
+    <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">HOI4D dataset</span> 
+      <!-- <span style="color: orange; font-weight:bold">(unseen real noise patterns)</span> -->
+      <!-- Results on the <span style="color: rgb(79, 151, 238); font-weight:bold">HOI4D</span> dataset -- with <span style="color: rgb(240, 100, 212); font-weight:bold">unseen real noise patterns</span> -->
+    </h2>
+      <p>
+        <span style="font-weight:bold">Challenges:</span> <span style="color: orange; font-weight:bold">1) difficult and novel interactions with new objects</span> and <span style="color: orange; font-weight:bold">2) unseen real noise patterns.</span>
+      </p>
+      <!-- <h3 class="title is-4">Open a scissor (<span style="color: rgb(240, 100, 212); font-weight:bold">difficult geometry -- thin rings</span> and <span style="color: rgb(66, 133, 227); font-weight:bold">challenging articulated motions</span>)</h3> -->
+      <!-- hoi4d-open-a-scissor-4 -->
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+          <!-- <source src="static/videos-lowres/hoi4d-scissors.mp4" type="video/mp4"> -->
+          <!-- <source src="static/videos-lowres/hoi4d-open-a-scissor-4.mp4" type="video/mp4"> -->
+          <source data-src="static/videos-lowres/hoi4d-res-1-block-3.mp4" type="video/mp4">
+        </video>
+
+        <!-- <h2 class="subtitle has-text-centered">
+          Open a scissor (<span style="color: rgb(240, 100, 212); font-weight:bold">difficult geometry -- thin rings</span> and <span style="color: rgb(66, 133, 227); font-weight:bold">challenging articulated motions</span>)
+        </h2> -->
+        <!-- <p>
+          Open a scissor (<span style="color: rgb(240, 100, 212); font-weight:bold">difficult geometry -- thin rings</span> and <span style="color: rgb(66, 133, 227); font-weight:bold">challenging articulated motions</span>)
+          <br> <br>
+        </p>
+         -->
+        <br><br>
+        <details>
+          <summary onclick="change_hoi4d()" id="showMoreBtn_hoi4d" class="title is-6 button" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">More results</summary>
+          <br><br>
+          <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+            <source data-src="static/videos-lowres/hoi4d-res-3-block-3.mp4" type="video/mp4">
+          </video>
+          <br><br>
+          <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+            <source data-src="static/videos-lowres/hoi4d-res-2-block-3.mp4" type="video/mp4">
+          </video>
+        </details>
+      <br>
+      <br>
+    <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">ARCTIC dataset</span> </h2>
+      <!-- <span style="color: orange; font-weight:bold">(dynamic object motions with changing contacts)</span> -->
+      <!-- <h3 class="title is-4">Open a box</h3> -->
+      <p>
+        <span style="font-weight:bold">Challenges:</span> <span style="color: orange; font-weight:bold">challenging interactions with changing contacts.</span>
+      </p>
+      <br>
+      <h2 class="subtitle has-text-centered" style="margin-bottom: -0px">
+        <!-- <span style="font-weight:bold">Results on</span> <span style="color: orange; font-weight:bold">long sequences with bimanual manipulations</span> -->
+        <span style="font-weight:bold">Comparisons on sequences of standard length</span>
+      </h2>
+      <br>
+      <video class="lazy" autoplay muted loop playsinline width="100%">
+      <!-- <video controls muted loop playsinline width="100%"> -->
+        <!-- <source src="static/videos-lowres/arctic-use-box-02-2.mp4" type="video/mp4"> -->
+        <source data-src="static/videos-lowres/arctic-res-1-block-5.mp4" type="video/mp4">
+      </video>
+      <!-- <h2 class="subtitle has-text-centered">
+        Open a box
+      </h2> -->
+      <!-- <p>
+        Open a box <br><br>
+      </p> -->
+      <br><br>
+      <details>
+        <summary onclick="change_arctic()" id="showMoreBtn_arctic" class="title is-6 button" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">More results</summary>
+        <br><br>
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+        <!-- <video controls muted loop playsinline width="100%"> -->
+          <source data-src="static/videos-lowres/arctic-res-2.mp4" type="video/mp4">
+        </video>
+        <br>
+        <hr style="height: 2px;  border-left: 200px; color: #4b4949; margin-left: 100px;  margin-right: 100px;">
+        <br>
+        <!-- < -->
+      </details>
+
+      
+      <h2 class="subtitle has-text-centered" style="margin-bottom: -0px">
+        <span style="font-weight:bold">Results on</span> <span style="color: orange; font-weight:bold">long sequences with bimanual manipulations</span>
+      </h2>
+      <!-- <p>
+        <span style="font-weight:bold">Results on</span> <span style="color: orange; font-weight:bold">long sequences with bimanual manipulations.</span>
+      </p> -->
+      <video class="lazy" autoplay muted loop playsinline width="100%">
+        <!-- <video controls muted loop playsinline width="100%"> -->
+          <!-- <source src="static/videos-lowres/arctic-use-box-02-2.mp4" type="video/mp4"> -->
+        <source data-src="static/videos-lowres/arctic-long-1.mp4" type="video/mp4">
+      </video>
+
+  </div>
+</section>
+
+
+<br>
+<br>
+<br>
+
+
+<section>
+  <div class="container is-max-widescreen is-centered has-text-centered">
+    <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">Stochastic Denoising Results</span></h2>
+    <!-- <h2 class="title is-3"></h2> -->
+      <!-- <h3 class="title is-4">Manipulate a camera (<span style="color: rgb(240, 100, 212); font-weight:bold">diverse and discrete modes</span> to <span style="color: orange; font-weight:bold">resolve penetrations</span>)</h3> -->
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+        <!-- <video controls muted loop playsinline width="100%"> -->
+          <source data-src="static/videos-lowres/gen-res-all-2-3.mp4" type="video/mp4">
+        </video>
+        <br><br>
+        <details>
+          <summary onclick="change_stochastic()" id="showMoreBtn_stochastic" class="title is-6 button" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">
+            More results
+            <!-- <button id="showMoreBtn" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">
+              More results
+            </button> -->
+          </summary>
+          <br><br>
+          <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+            <source data-src="static/videos-lowres/gen-res-all-3-3.mp4" type="video/mp4">
+          </video>
+          <br><br>
+          <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+            <source data-src="static/videos-lowres/gen-res-all-4-3.mp4" type="video/mp4">
+          </video>
+        </details>
+        <!-- <h2 class="subtitle has-text-centered">
+          (a) Manipulate a camera (<span style="color: rgb(240, 100, 212); font-weight:bold">diverse and discrete modes</span> to <span style="color: orange; font-weight:bold">resolve penetrations</span>)
+        </h2> -->
+        <!-- <p>
+          Manipulate a camera (<span style="color: rgb(240, 100, 212); font-weight:bold">diverse and discrete modes</span> to <span style="color: orange; font-weight:bold">resolve penetrations</span>)
+        </p> -->
+
+        <!-- <video autoplay muted loop playsinline width="80%">
+          <source src="static/videos-lowres/gen-open-scissors-3.mp4" type="video/mp4">
+        </video>
+        <p>
+          Rotate a scissor (<span style="color: rgb(240, 100, 212); font-weight:bold">diverse and discrete modes</span> to <span style="color: orange; font-weight:bold">complete the task</span>)
+        </p> -->
+        
+  </div>
+</section>
+
+<br>
+<br>
+<br>
+
+<section>
+  <div class="container is-max-widescreen is-centered has-text-centered">
+    <h2 class="title is-3"><span style="color: rgb(0, 0, 0); font-weight:bold">Applications</span></h2>
+        <video class="lazy" autoplay muted loop playsinline width="100%">
+        <!-- <video muted controls loop playsinline width="100%"> -->
+          <source data-src="static/videos-lowres/appli-denosing-3.mp4" type="video/mp4">
+        </video>
+        <br><br>
+        <details>
+          <summary onclick="change_appli()" id="showMoreBtn_appli" class="title is-6 button" style="width: 130px; height: 35px; border-radius: 20px; background-color: #1e1c1c; color: #fff; font-size: 17px; border: none; cursor: pointer;">
+            More results
+          </summary>
+          <br><br>
+          <video class="lazy" autoplay muted loop playsinline width="100%">
+          <!-- <video controls muted loop playsinline width="100%"> -->
+            <source data-src="static/videos-lowres/appli-synthesis.mp4" type="video/mp4">
+          </video>
+        </details>
+  </div>
+</section>
+
+
+<br>
+<br>
+<br>
+
+<script src="https://polyfill.io/v3/polyfill.js?features=IntersectionObserver"></script>
+<!-- <script src="/assets/js/yall.js"></script> -->
+<script>
+    yall(
+        {
+            observeChanges: true
+        }
+    );
+</script>
+<!-- <script src="/assets/js/scripts.js"></script> -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.bundle.min.js"></script>
+<script src="https://uploads-ssl.webflow.com/51e0d73d83d06baa7a00000f/js/webflow.fd002feec.js"></script>
+
+<script>
+  document.addEventListener("DOMContentLoaded", function() {
+    var lazyVideos = [].slice.call(document.querySelectorAll("video.lazy"));
+    if ("IntersectionObserver" in window) {
+      var lazyVideoObserver = new IntersectionObserver(function(entries, observer) {
+        entries.forEach(function(video) {
+          if (video.isIntersecting) {
+            for (var source in video.target.children) {
+              var videoSource = video.target.children[source];
+              if (typeof videoSource.tagName === "string" && videoSource.tagName === "SOURCE") {
+                videoSource.src = videoSource.dataset.src;
+              }
+            }
+            video.target.load();
+            video.target.classList.remove("lazy");
+            lazyVideoObserver.unobserve(video.target);
+          }
+        });
+      });
+      lazyVideos.forEach(function(lazyVideo) {
+        lazyVideoObserver.observe(lazyVideo);
+      });
+    }
+  });
+</script>
+
+
+<script>
+  function change_stochastic() {
+    console.info("hhh\n");
+    const showMoreBtn = document.getElementById('showMoreBtn_stochastic');
+    if (showMoreBtn.innerText == 'More results') {
+      showMoreBtn.innerText = 'Hide';
+    } else {
+      showMoreBtn.innerText = 'More results';
+    }
+  };
+
+  function change_arctic() {
+    console.info("hhh\n");
+    const showMoreBtn = document.getElementById('showMoreBtn_arctic');
+    if (showMoreBtn.innerText == 'More results') {
+      showMoreBtn.innerText = 'Hide';
+    } else {
+      showMoreBtn.innerText = 'More results';
+    }
+  };
+
+  function change_hoi4d() {
+    console.info("hhh\n");
+    const showMoreBtn = document.getElementById('showMoreBtn_hoi4d');
+    if (showMoreBtn.innerText == 'More results') {
+      showMoreBtn.innerText = 'Hide';
+    } else {
+      showMoreBtn.innerText = 'More results';
+    }
+  };
+
+  function change_grabbeta() {
+    console.info("hhh\n");
+    const showMoreBtn = document.getElementById('showMoreBtn_grabbeta');
+    if (showMoreBtn.innerText == 'More results') {
+      showMoreBtn.innerText = 'Hide';
+    } else {
+      showMoreBtn.innerText = 'More results';
+    }
+  };
+
+  function change_grab() {
+    console.info("hhh\n");
+    const showMoreBtn = document.getElementById('showMoreBtn_grab');
+    if (showMoreBtn.innerText == 'More results') {
+      showMoreBtn.innerText = 'Hide';
+    } else {
+      showMoreBtn.innerText = 'More results';
+    }
+  };
+
+  function change_appli() {
+    console.info("hhh\n");
+    const showMoreBtn = document.getElementById('showMoreBtn_appli');
+    if (showMoreBtn.innerText == 'More results') {
+      showMoreBtn.innerText = 'Hide';
+    } else {
+      showMoreBtn.innerText = 'More results';
+    }
+  };
+</script>
+
+
+<footer class="footer">
+  <div class="container">
+    <div class="content has-text-centered">
+      <a class="icon-link"
+         href="./static/pdfs/GeneOH_Diffusion.pdf">
+        <i class="fas fa-file-pdf"></i>
+      </a>
+      <a class="icon-link"
+         href="./static/videos/video-2.mp4">
+        <i class="fab fa-youtube"></i>
+      </a>
+    </div>
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content">
+          <p>
+            The template is borrowed from <a href="https://github.com/nerfies/nerfies.github.io">Nerfies</a>. We thank authors for their codebase.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
