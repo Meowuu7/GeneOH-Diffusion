@@ -1,0 +1,18 @@
+-f https://data.pyg.org/whl/torch-1.12.1+cu116.html
+# pip==20.2.4
+torch==1.12.1
+# torchvision==0.13.1
+# torchaudio==0.12.1
+blobfile==2.0.1
+# manopth @ git+https://github.com/hassony2/manopth.git
+numpy==1.23.1
+psutil==5.9.2
+scikit-learn
+scipy==1.9.3
+tensorboard
+tensorboardx
+tqdm
+trimesh
+clip
+chumpy
+opencv-python
