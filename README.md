@@ -5,7 +5,7 @@
 
 The PyTorch implementation of the paper [**"GeneOH Diffusion"**](https://arxiv.org/abs/2209.14916).
 
-![teaser](https://github.com/GuyTevet/mdm-page/raw/main/static/figures/github.gif)
+![teaser](./assets/demo.gif)
 
 
 ## Getting started
