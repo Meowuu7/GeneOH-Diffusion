@@ -1,6 +1,6 @@
--f https://data.pyg.org/whl/torch-1.12.1+cu116.html
-# pip==20.2.4
-torch==1.12.1
+# -f https://data.pyg.org/whl/torch-1.12.1+cu116.html
+# # pip==20.2.4
+# torch==1.12.1
 # torchvision==0.13.1
 # torchaudio==0.12.1
 blobfile==2.0.1

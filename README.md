@@ -24,13 +24,25 @@ Create a virtual environment
 conda create -n geneoh-diffusion python==3.8.13
 ```
 
-Install dependencies via `pip`
+Install `torch2.2.0+cu121`
+```shell
+pip3 install torch torchvision torchaudio
+```
+
+Install `torch_cluster`
+```shell
+cd whls
+pip install torch_cluster-1.6.3+pt22cu121-cp38-cp38-linux_x86_64.whl
+cd ..
+```
+
+Install remaining dependencies
 
 ```shell
 pip install -r requirements.txt --no-cache
 ```
 
-Install `manopth`
+(**Important**) Install `manopth`
 
 ```shell
 cd manopth

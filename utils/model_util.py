@@ -1,12 +1,12 @@
-from model.mdm import MDM
-from model.mdm_ours import MDM as MDM_Ours
-from model.mdm_ours import MDMV3 as MDM_Ours_V3
-from model.mdm_ours import MDMV4 as MDM_Ours_V4
-from model.mdm_ours import MDMV5 as MDM_Ours_V5
-from model.mdm_ours import MDMV6 as MDM_Ours_V6
-from model.mdm_ours import MDMV7 as MDM_Ours_V7
-from model.mdm_ours import MDMV8 as MDM_Ours_V8
-from model.mdm_ours import MDMV9 as MDM_Ours_V9
+# from model.mdm import MDM
+# from model.mdm_ours import MDM as MDM_Ours
+# from model.mdm_ours import MDMV3 as MDM_Ours_V3
+# from model.mdm_ours import MDMV4 as MDM_Ours_V4
+# from model.mdm_ours import MDMV5 as MDM_Ours_V5
+# from model.mdm_ours import MDMV6 as MDM_Ours_V6
+# from model.mdm_ours import MDMV7 as MDM_Ours_V7
+# from model.mdm_ours import MDMV8 as MDM_Ours_V8
+# from model.mdm_ours import MDMV9 as MDM_Ours_V9
 from model.mdm_ours import MDMV10 as MDM_Ours_V10
 from model.mdm_ours import MDMV11 as MDM_Ours_V11
 # MDM_Ours_V12

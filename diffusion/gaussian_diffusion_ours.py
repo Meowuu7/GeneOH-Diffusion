@@ -22,7 +22,7 @@ import utils.model_util as model_util
 import utils.model_utils as model_utils
 import utils.common_utils as common_utils
 from manopth.manolayer import ManoLayer
-from sample.reconstruct_data import calculate_disp_quants_batched, calculate_disp_quants_batched_v2
+# from sample.reconstruct_data import calculate_disp_quants_batched, calculate_disp_quants_batched_v2
 
 
 def get_named_beta_schedule(schedule_name, num_diffusion_timesteps, scale_betas=1.):

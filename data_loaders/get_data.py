@@ -1,7 +1,7 @@
 from torch.utils.data import DataLoader
 from data_loaders.tensors import collate as all_collate
 from data_loaders.tensors import t2m_collate, motion_ours_collate, motion_ours_singe_seq_collate, motion_ours_obj_base_rel_dist_collate
-from data_loaders.humanml.data.dataset import HumanML3D
+# from data_loaders.humanml.data.dataset import HumanML3D
 import torch
 
 def get_dataset_class(name, args=None):
@@ -109,7 +109,7 @@ def get_dataset(name, num_frames, split='train', hml_mode='train', args=None):
         
         w_vectorizer = None
         # split = "val" ## add split, split here --> split --> split and split ##
-        data_path = "/data1/sim/GRAB_processed"
+        data_path = "/data1/xueyi/GRAB_processed"
         # split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None
         window_size = args.window_size
         # split=  "val"
