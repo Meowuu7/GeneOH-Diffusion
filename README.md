@@ -63,7 +63,7 @@ Use the model to clean the noisy trajectory `data/taco/source_data/20231104_017.
 
 |        Input        |       Result         |         Overlayed         |
 | :----------------------: | :---------------------: | :-----------------------: |
-| ![](assets/taco-20231104_017-src-a.gif) | ![](assets/taco-20231104_017-res-a.gif) | ![](assets/taco-20231104_017-overlayed-a.gif) |
+| ![](assets/taco-20231104_017-src.gif) | ![](assets/taco-20231104_017-res.gif) | ![](assets/taco-20231104_017-overlayed.gif) |
 
 
 Follow steps below to reproduce the above result. 

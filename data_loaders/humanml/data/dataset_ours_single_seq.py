@@ -5663,6 +5663,7 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
                 pert_rhand_anchors - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
             )
         
+        # (object)
         object_pc_th = torch.matmul(
             object_pc_th - object_trcansl_th.unsqueeze(1),  object_global_orient_mtx_th.transpose(1, 2)
         )
@@ -7076,8 +7077,8 @@ class GRAB_Dataset_V19_Arctic_from_Pred(torch.utils.data.Dataset): # GRAB datass
 
 # GRAB v19 arctic ###
 class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
-    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None): # 
-        #### GRAB dataset #### GRAB dataset ##
+    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
+        #### GRAB dataset ####
         self.clips = []
         self.len = 0
         self.window_size = window_size
