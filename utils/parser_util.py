@@ -261,6 +261,8 @@ def add_base_options(parser):
     group.add_argument("--diff_hand_params", default=False, action='store_true', help="Use cuda device, otherwise use CPU.")
     group.add_argument("--corr_fn", default="", type=str,
                        help="If empty, will use defaults according to the specified dataset.")
+    
+    group.add_argument("--prev_test_tag", default="", type=str,)
     # 
     group.add_argument("--augment", default=False, action='store_true', help="Use cuda device, otherwise use CPU.")
     # train_all_clips
@@ -349,6 +351,8 @@ def add_training_options(parser):
                        help="Path to a text file lists text prompts to be synthesized. If empty, will take text prompts from dataset.")
     group.add_argument("--save_dir", required=True, type=str,
                        help="Path to save checkpoints and results.")
+    group.add_argument("--grab_processed_dir", type=str, default="data/grab/source_data",)
+    group.add_argument("--data_root", type=str, default="data", help="Path to save checkpoints and results.")
     group.add_argument("--overwrite", action='store_true',
                        help="If True, will enable to use an already existing save_dir.")
     group.add_argument("--train_platform_type", default='NoPlatform', choices=['NoPlatform', 'ClearmlPlatform', 'TensorboardPlatform'], type=str,

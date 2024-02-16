@@ -1,0 +1,10 @@
+ckpts/
+
+data/*/result/
+
+data/grab/object_meshes/
+
+data/*/*.zip
+
+*.npy
+

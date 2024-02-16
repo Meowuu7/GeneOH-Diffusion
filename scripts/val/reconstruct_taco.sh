@@ -12,15 +12,6 @@ export single_seq_path="/data3/hlyang/results/test_data/20231103/20231103_020.pk
 export test_tag="20231103_020_jts_spatial_t_100_hho_"
 
 
-# export use_arctic=""
-# export use_hho="--use_hho"
-# export use_left="--use_left"
-
-# export use_reverse=""
-
-# export seed=0
-
-
 export save_dir="/data3/datasets/xueyi/hho_save_res"
 
 

@@ -127,6 +127,9 @@ def main():
 
     fixseed(args.seed)
     
+
+    dist_util.setup_dist(args.device)
+    
     single_seq_path = args.single_seq_path
     test_seq_idx = single_seq_path.split("/")[-1].split(".")[0]
     test_seq_idx = int(test_seq_idx)
@@ -134,37 +137,34 @@ def main():
     ### and also add the arg -> prev test tag ###
     save_dir = args.save_dir
     
+    prev_test_tag = args.prev_test_tag
     
-    
-    # os.makedirs(save_dir, exist_ok=True)
+    test_tag = args.test_tag
     
 
-    dist_util.setup_dist(args.device)
-    
+    # tot_test_seq_idxes = range(0, 205, 1)
+    tot_test_seq_idxes = range(1, 205, 1)
+    # tot_test_seq_idxes = range(5, 6, 1)
 
     args.start_idx = 0
     
-    # use_reverse = args.use_reverse
+    
     os.makedirs(args.save_dir, exist_ok=True)
     train_platform_type = eval(args.train_platform_type)
     train_platform = train_platform_type(args.save_dir)
     train_platform.report_args(args, name='Args') # train platform
-    
-    
-    
+
     args_path = os.path.join(args.save_dir, 'args.json')
     with open(args_path, 'w') as fw:
-        json.dump(vars(args), fw, indent=4, sort_keys=True)
-    
-    print(f"save_dir: {save_dir}, single_seq_path: {single_seq_path}")
+        # json.dump(vars(args), fw, indent=4, sort_keys=True)
+        json.dump(vars(args), fw, indent=4, sort_keys=False)
     
     for cur_seed in range(0, 122, 11):
     # for test_seq_idx in tot_test_seq_idxes:
     # try:
     # for test_seq_idx in tot_test_seq_idxes:
 
-        # cur_single_seq_path = os.path.join(seq_root, f"{test_seq_idx}.npy")
-        cur_single_seq_path = single_seq_path
+        cur_single_seq_path = single_seq_path # os.path.join(seq_root, f"{test_seq_idx}.npy")
         args.single_seq_path = cur_single_seq_path
         print(f"cur_single_seq_path: {cur_single_seq_path}")
         
@@ -173,9 +173,9 @@ def main():
     
         args.seed = cur_seed # random seeds #
 
-
-        args.predicted_info_fn = f"" 
-
+        args.predicted_info_fn = f"predicted_infos_seq_{test_seq_idx}_seed_{cur_seed}_tag_{prev_test_tag}.npy" 
+        args.predicted_info_fn = os.path.join(save_dir, args.predicted_info_fn)
+        
         print(f"Current sequence path: {args.single_seq_path}, seed: {args.seed}")
         
         ## get dataest loader ##

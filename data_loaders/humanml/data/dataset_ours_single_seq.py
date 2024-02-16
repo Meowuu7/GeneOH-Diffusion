@@ -9,2840 +9,20 @@ import utils
 import pickle
 
 import data_loaders.humanml.data.utils as utils
-# cp -r 
 
 import random
 import trimesh
 from scipy.spatial.transform import Rotation as R
 
 import pickle as pkl
-# from anchorutils import anchor_load_driver, recover_anchor, recover_anchor_batch
-# from anchorutils import masking_load_driver
 
-from utils.anchor_utils import masking_load_driver, anchor_load_driver, recover_anchor_batch ### load driver; masking load driver #
-
-
-# anchorutils, anchordataset #
-
-# 
-
-### GRAB_dataset_V15 ###
-# GRAB dataset with pose # # GRAB_Dataset_V16 #
-class GRAB_Dataset_V16(torch.utils.data.Dataset):
-    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
-        #### GRAB dataset #### ## GRAB dataset
-        self.clips = []
-        self.len = 0
-        self.window_size = window_size
-        self.step_size = step_size
-        self.num_points = num_points
-        
-        split = args.single_seq_path.split("/")[-2].split("_")[0]
-        self.split = split
-        print(f"split: {self.split}")
-        
-        
-        # self.split = split
-        
-        
-        self.model_type = 'v1_wsubj_wjointsv25'
-        self.debug = False
-        # self.use_ambient_base_pts = args.use_ambient_base_pts
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        self.num_sche_steps = 100
-        self.w_vectorizer = w_vectorizer
-        self.use_pert = True
-        self.use_rnd_aug_hand = True
-        
-        self.args = args
-        
-        self.seq_path = args.single_seq_path
-        
-        self.inst_normalization = args.inst_normalization
-        
-        
-        # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
-        
-        
-        
-        self.aug_trans_T = 0.05
-        self.aug_rot_T = 0.3
-        self.aug_pose_T = 0.5
-        self.aug_zero = 1e-4 if self.model_type not in ['v1_wsubj_wjointsv24', 'v1_wsubj_wjointsv25'] else 0.01
-        
-        self.sigmas_trans = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_trans_T), self.num_sche_steps
-        ))
-        self.sigmas_rot = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_rot_T), self.num_sche_steps
-        ))
-        self.sigmas_pose = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_pose_T), self.num_sche_steps
-        ))
-        
-        
-        self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
-        # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
-        self.aug = True
-        self.use_anchors = False
-        # self.args = args
-        
-        
-        ''' Load avg-jts, std-jts '''
-        avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
-        std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
-        avg_jts = np.load(avg_jts_fn, allow_pickle=True)
-        std_jts = np.load(std_jts_fn, allow_pickle=True)
-        # self.avg_jts, self.std_jts #
-        self.avg_jts = torch.from_numpy(avg_jts).float()
-        self.std_jts = torch.from_numpy(std_jts).float()
-        ''' Load avg-jts, std-jts '''
-        
-        
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmesh = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        for i, fn in enumerate(obj_meshes):
-            id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        self.id2objmesh = id2objmesh
-        
-        ## obj root folder; obj p
-        ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
-        
-        # self.dist_stra = args.dist_stra
-        
-        self.load_meta = True
-        
-        self.dist_threshold = 0.005
-        self.nn_base_pts = 700
-        
-        mano_pkl_path = os.path.join(self.mano_path, 'MANO_RIGHT.pkl')
-        with open(mano_pkl_path, 'rb') as f:
-            mano_model = pickle.load(f, encoding='latin1')
-        self.template_verts = np.array(mano_model['v_template'])
-        self.template_faces = np.array(mano_model['f'])
-        self.template_joints = np.array(mano_model['J'])
-        #### finger tips; ####
-        self.template_tips = self.template_verts[[745, 317, 444, 556, 673]]
-        self.template_joints = np.concatenate([self.template_joints, self.template_tips], axis=0)
-        #### template verts ####
-        self.template_verts = self.template_verts * 0.001
-        #### template joints ####
-        self.template_joints = self.template_joints * 0.001 # nn_joints x 3 #
-        # condition on template joints for current joints #
-        
-        # self.template_joints = self.template_verts[self.hand_palm_vertex_mask]
-        
-        self.fingers_stats = [
-            [16, 15, 14, 13, 0],
-            [17, 3, 2, 1, 0],
-            [18, 6, 5, 4, 0],
-            [19, 12, 11, 10, 0],
-            [20, 9, 8, 7, 0]
-        ]
-        # 5 x 5 states, the first dimension is the finger index
-        self.fingers_stats = np.array(self.fingers_stats, dtype=np.int32)
-        self.canon_obj = True
-        
-        self.dir_stra = "vecs" # "rot_angles", "vecs"
-        # self.dir_stra = "rot_angles"
-        
-        
-        self.mano_layer = ManoLayer(
-            flat_hand_mean=True,
-            side='right',
-            mano_root=self.mano_path, # mano_root #
-            ncomps=24,
-            use_pca=True,
-            root_rot_mode='axisang',
-            joint_rot_mode='axisang'
-        )
-        
-        ## actions taken 
-        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
-        # os.makedirs(self.clip_sv_folder, exist_ok=True)
-
-        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
-        # #### filter files_clean here ####
-        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
-        
-        files_clean = [self.seq_path]
-        
-        if self.load_meta:
-          
-            for i_f, f in enumerate(files_clean): ### train, val, test clip, clip_len ###
-            # for 
-                # if split != 'train' and split != 'val' and i_f >= 100:
-                #     break
-                # if split == 'train':
-                    # print(f"loading {i_f} / {len(files_clean)}")
-                print(f"loading {i_f} / {len(files_clean)}")
-                base_nm_f = os.path.basename(f)
-                base_name_f = base_nm_f.split(".")[0]
-                cur_clip_meta_data_sv_fn = f"{base_name_f}_meta_data.npy"
-                cur_clip_meta_data_sv_fn = os.path.join(data_folder, split, cur_clip_meta_data_sv_fn)
-                cur_clip_meta_data = np.load(cur_clip_meta_data_sv_fn, allow_pickle=True).item()
-                cur_clip_len = cur_clip_meta_data['clip_len']
-                # clip_len = (cur_clip_len - window_size) // step_size + 1
-                # clip_len = cur_clip_len
-                
-                self.clips.append(self.load_clip_data(i_f, f=f)) ## add current clip ##
-                # self.clips.append((self.len, self.len+clip_len,  f
-                #     ))
-                clip_len = self.clips[i_f][3][3].shape[0]
-                self.len += clip_len # len clip len
-                self.len = 81
-                
-                
-        else:
-            for i_f, f in enumerate(files_clean):
-                if split == 'train':
-                    print(f"loading {i_f} / {len(files_clean)}")
-                if split != 'train' and i_f >= 100:
-                    break
-                if args is not None and args.debug and i_f >= 10:
-                    break
-                clip_clean = np.load(f)
-                pert_folder_nm = split + '_pert'
-                if args is not None and not args.use_pert:
-                    pert_folder_nm = split
-                clip_pert = np.load(os.path.join(data_folder, pert_folder_nm, os.path.basename(f)))
-                clip_len = (len(clip_clean) - window_size) // step_size + 1
-                sv_clip_pert = {}
-                for i_idx in range(6):
-                    sv_clip_pert[f'f{i_idx + 1}'] = clip_pert[f'f{i_idx + 1}']
-                
-                ### sv clip pert, 
-                ##### load subj params #####
-                pure_file_name = f.split("/")[-1].split(".")[0]
-                pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                        
-                subj_params_fn = os.path.join(self.subj_data_folder, split, pure_subj_params_fn)
-                subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-                rhand_transl = subj_params["rhand_transl"]
-                rhand_betas = subj_params["rhand_betas"]
-                rhand_pose = clip_clean['f2'] ## rhand pose ##
-                
-                pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-                pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-                ##### load subj params #####
-                
-                # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-                # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-                ### pert and clean pair for encoding and decoding ###
-                self.clips.append((self.len, self.len+clip_len, clip_pert,
-                    [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                    # subj_corr_data, pert_subj_corr_data
-                    ))
-                # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
-                #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                #     # subj_corr_data, pert_subj_corr_data
-                #     ))
-                self.len += clip_len # len clip len
-        self.clips.sort(key=lambda x: x[0])
-    
-    def uinform_sample_t(self):
-        t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
-        return t
-    
-    def load_clip_data(self, clip_idx, f=None):
-        if f is None:
-          cur_clip = self.clips[clip_idx]
-          if len(cur_clip) > 3:
-              return cur_clip
-          f = cur_clip[2]
-        clip_clean = np.load(f)
-        pert_folder_nm = self.split # + '_pert'
-        # if not self.use_pert:
-        #     pert_folder_nm = self.split
-        # clip_pert = np.load(os.path.join(self.data_folder, pert_folder_nm, os.path.basename(f)))
-        
-        
-        ##### load subj params #####
-        pure_file_name = f.split("/")[-1].split(".")[0]
-        pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                
-        subj_params_fn = os.path.join(self.subj_data_folder, self.split, pure_subj_params_fn)
-        subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-        rhand_transl = subj_params["rhand_transl"]
-        rhand_betas = subj_params["rhand_betas"]
-        rhand_pose = clip_clean['f2'] ## rhand pose ##
-        
-        object_global_orient = clip_clean['f5'] ## clip_len x 3 --> orientation 
-        object_trcansl = clip_clean['f6'] ## cliplen x 3 --> translation
-        
-        object_idx = clip_clean['f7'][0].item()
-        
-        pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-        pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        ##### load subj params #####
-        
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
-        # maxx_clip_len = 
-        loaded_clip = (
-            0, rhand_transl.shape[0], None,
-            [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
-        )
-        # self.clips[clip_idx] = loaded_clip
-        
-        return loaded_clip
-        
-        # self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #     # subj_corr_data, pert_subj_corr_data
-        #     ))
-
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
-    def __getitem__(self, index):
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        i_c = 0
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
-
-        object_id = c[3][-1]
-        object_name = self.id2objmeshname[object_id]
-        
-        start_idx = index * self.step_size
-        if start_idx + self.window_size > self.len:
-            start_idx = self.len - self.window_size
-            
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        
-        # data = c[2][start_idx:start_idx+self.window_size]
-        # # object_global_orient = self.data[index]['f5']
-        # # object_transl = self.data[index]['f6'] #
-        # object_global_orient = data['f5'] ### get object global orientations ###
-        # object_trcansl = data['f6']
-        # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        object_global_orient = c[3][-3] # num_frames x 3 
-        object_transl = c[3][-2] # num_frames x 3
-        
-        
-        # object_global_orient, object_transl #
-        object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        object_transl = object_transl[start_idx: start_idx + self.window_size]
-        object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        # object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        # object_trcansl_th = torch.from_numpy(object_trcansl).float()
-        
-        # pert_subj_params = c[4]
-        
-        st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx
-        
-        ### pts gt ###
-        ## rhnad pose, rhand pose gt ##
-        ## glboal orientation and hand pose #
-        rhand_global_orient_gt, rhand_pose_gt = c[3][3], c[3][4]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-        rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-        rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-        
-        rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-        rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-        
-        rhand_transl, rhand_betas = c[3][5], c[3][6]
-        rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas
-        
-        # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-        rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-        rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
-        
-        # # orientation rotation matrix #
-        # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
-        # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
-        # # orientation rotation matrix #
-        
-        rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
-        rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
-        rhand_beta_var = torch.from_numpy(rhand_betas).float()
-        rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
-        # R.from_rotvec(obj_rot).as_matrix()
-        
-        ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
-        #### ==== get random augmented pose, rot, transl ==== ####
-        # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
-        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # ### === get and save noise vectors === ###
-        # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
-        aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
-        aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
-        aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
-        # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
-        # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
-        # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
-        # ### creat augmneted orientations, pose, and transl ###
-        rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
-        rnd_aug_pose_var = rhand_pose_var + aug_pose_var
-        rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
-        
-        
-        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_betas_var, rhand_beta_var
-        rhand_verts, rhand_joints = self.mano_layer(
-            torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
-        )
-        ### rhand_joints: for joints ###
-        rhand_verts = rhand_verts * 0.001
-        rhand_joints = rhand_joints * 0.001
-         
-        # self.anchor_face_vertex_index = fvi
-        #     self.anchor_weight = aw
-        
-        ### Get palm verts ###
-        # palm_verts = rhand_verts[:, self.hand_palm_vertex_mask, :]
-
-        # rhand_joints_gt = rhand_joints.numpy() # num_frams x 21 x 3 #
-        # rhand_verts_gt = rhand_verts.numpy()
-        
-        # ### Get cannonical rhandjoints ###
-        # canon_rhand_verts, canon_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(rhand_global_orient_var), rhand_pose_var], dim=-1), 
-        #     rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(rhand_transl_var)
-        # )
-        # canon_rhand_joints = canon_rhand_joints * 0.001
-        # canon_rhand_verts = canon_rhand_verts * 0.001
-        # ### Get cannonical rhandjoints ###
-        
-        
-        # ### Get cannonical rhandjoints ###
-        # trans_canon_rhand_verts, trans_canon_rhand_joints = self.mano_layer(
-        #     torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1), 
-        #     rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(rhand_transl_var)
-        # )
-        # trans_canon_rhand_joints = trans_canon_rhand_joints * 0.001
-        # trans_canon_rhand_verts = trans_canon_rhand_verts * 0.001
-        ### Get cannonical rhandjoints ###
-        ### Canonical finger stats ###
-        # finger_stats = self.fingers_stats
-        # canon_tips = canon_rhand_joints.numpy()[:, finger_stats[:, 0]] # num_frams x 5 x 3
-        # canon_other_joint = canon_rhand_joints.numpy()[:, finger_stats[:, 1:]] # num_frams x 5 x 4 x 3
-        # canon_tips_to_other_joints = canon_other_joint - np.reshape(canon_tips, (canon_tips.shape[0], canon_tips.shape[1], 1, 3)) # num_frams x 5 x 4 x 3
-        # # tips_feats: nf x 5 x (3 + 4 * 3) = nf x 5 x 15 #
-        # canon_tips_feats = np.concatenate(
-        #     [canon_tips, canon_tips_to_other_joints.reshape(canon_tips.shape[0], canon_tips.shape[1], -1)], axis=-1
-        # ) ### 
-        ### Canonical finger stats ###
-        
-        # ### Get pert rhand pose, orientation, betas, transl, joints and verts ###
-        # pert_rhand_global_orient = data['f1'].reshape(self.window_size, 3).astype(np.float32)
-        # pert_rhand_pose = data['f2'].reshape(self.window_size, -1).astype(np.float32)
-        # pert_rhand_betas = pert_subj_params['rhand_betas'].reshape(-1).astype(np.float32)
-        # pert_rhand_transl = pert_subj_params['rhand_transl'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # ##### Get pert rhand vertices and joints #####
-        # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient)
-        # pert_rhand_global_orient_mtx_var = torch.from_numpy(pert_rhand_global_orient_mtx).float()
-        
-        # pert_rhand_global_orient_var = torch.from_numpy(pert_rhand_global_orient).float()
-        # pert_rhand_pose_var = torch.from_numpy(pert_rhand_pose).float()
-        # pert_rhand_betas_var = torch.from_numpy(pert_rhand_betas).float()
-        # pert_rhand_transl_var = torch.from_numpy(pert_rhand_transl).float()
-        
-        
-        # ### ws x 3; ws x psoe_dim; ws x 3 ##3
-        # ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        # ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-        if self.use_rnd_aug_hand: ## rnd aug pose var, transl var #
-            # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-            pert_rhand_global_orient_var = rnd_aug_global_orient_var.clone()
-            pert_rhand_pose_var = rnd_aug_pose_var.clone()
-            pert_rhand_transl_var = rnd_aug_transl_var.clone()
-            # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient_var.numpy())
-        
-        # # pert_rhand_betas_var
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_joints --> for rhand joints in the camera frmae ###
-        pert_rhand_verts, pert_rhand_joints = self.mano_layer(
-            torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), pert_rhand_transl_var
-        )
-        pert_rhand_verts = pert_rhand_verts * 0.001 # verts 
-        pert_rhand_joints = pert_rhand_joints * 0.001 # joints
-        
-        
-        
-        # canon_pert_rhand_verts, canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
-        # canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
-        
-        # ### trans_canon_pert_rhand_joints, trans_canon_rhand_joints ###
-        # trans_canon_pert_rhand_verts, trans_canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # trans_canon_pert_rhand_verts = trans_canon_pert_rhand_verts * 0.001 # verts 
-        # trans_canon_pert_rhand_joints = trans_canon_pert_rhand_joints * 0.001 # joints
-        
-        
-        
-        
-        # ### Relative positions from base points to rhand joints ###
-        # object_pc = data['f3'].reshape(self.window_size, -1, 3).astype(np.float32)
-        # object_normal = data['f4'].reshape(self.window_size, -1, 3).astype(np.float32)
-        # object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        # object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
-        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
-        
-        # base_pts_feats_sv_dict = {}
-        #### distance between rhand joints and obj pcs ####
-        # pert_rhand_joints_th = pert_rhand_joints
-        # dist_pert_rhand_joints_obj_pc = torch.sum(
-        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        # )
-        # _, minn_dists_pert_joints_obj_idx = torch.min(dist_pert_rhand_joints_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
-        # pert_nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_pert_joints_obj_idx, dim=1)
-        # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-        # dist_object_pc_nearest_pcs = torch.sum(
-        #     (object_pc_th.unsqueeze(2) - pert_nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1
-        # )
-        # dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs
-        # dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
-        # # dist_threshold = 0.01
-        # dist_threshold = self.dist_threshold
-        # # dist_threshold for pc_nearest_pcs #
-        # dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-        
-        # # base_pts_mask: nn_obj_pcs #
-        # base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
-        # # nn_base_pts x 3 -> torch tensor #
-        # base_pts = object_pc_th[0][base_pts_mask]
-        # # base_pts_bf_sampling = base_pts.clone()
-        # base_normals = object_normal_th[0][base_pts_mask]
-        
-        # nn_base_pts = self.nn_base_pts
-        # base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
-        # base_pts_idxes = base_pts_idxes[:nn_base_pts]
-        # if self.debug:
-        #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # ### get base points ### # base_pts and base_normals #
-        # base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
-        # base_normals = base_normals[base_pts_idxes]
-        
-        
-        # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        # base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        # base_pts_transl = object_trcansl_th[0] # 3
-        
-        # if self.dir_stra == "rot_angles": ## rot angles ##
-        #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # if self.canon_obj:
-        #     ### reverse transform base points ###
-        #     ### canonicalize base points and base normals ###
-        #     base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-        #         ) # .transpose(0, 1)
-        #     base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-                # ) # .transpose(0, 1)
-        
-        
-        # if self.canon_obj:
-        #     # # # pert_rhand_joints,rhand_joints #
-        #     # reverse_trans_pert_rhand_verts_th, reverse_trans_rhand_verts_th #
-        #     # rel_base_pts_to_pert_rhand_joints, rel_base_pts_to_rhand_joints #
-        #     # pert_rhand_verts = torch.matmul(
-        #     #     pert_rhand_verts - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        #     # )
-        #     # rhand_verts = torch.matmul(
-        #     #     rhand_verts - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        #     # )
-        #     # reverse_trans_pert_rhand_joints_th, reverse_trans_rhand_joints_th #
-        #     # pert_rhand_joints = torch.matmul(
-        #     #     pert_rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        #     # )
-        #     rhand_joints = torch.matmul(
-        #         rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        #     )
-            
-        #     # ## TODO: should use object rotations to canonicalize those value as well ##
-        #     # ## # trans_canon_pert_rhand_joints, trans_canon_rhand_joints # ##
-        #     # trans_canon_pert_rhand_joints = torch.matmul(
-        #     #     trans_canon_pert_rhand_joints, object_global_orient_mtx_th.transpose(1, 2)
-        #     # )
-        #     # trans_canon_rhand_joints = torch.matmul(
-        #     #     trans_canon_rhand_joints, object_global_orient_mtx_th.transpose(1, 2)
-        #     # )
-            
-        #     # ## rel_base_pts_to_pert_rhand_joints, rel_base_pts_to_rhand_joints: ws x nn_joints x nn_samples x 3 ##
-        #     # ## dist_base_pts_to_pert_rhand_joints, dist_base_pts_to_rhand_joints ##
-        #     # rel_base_pts_to_pert_rhand_joints = torch.matmul(
-        #     #     rel_base_pts_to_pert_rhand_joints, object_global_orient_mtx_th.unsqueeze(1).transpose(-1, -2).contiguous()
-        #     # )
-        #     # rel_base_pts_to_rhand_joints = torch.matmul(
-        #     #     rel_base_pts_to_rhand_joints, object_global_orient_mtx_th.unsqueeze(1).transpose(-1, -2).contiguous()
-        #     # )
-        # else:
-        #     pass
-        
-        
-        
-        # ##### ===== calculate relative positions, distances, directions ====== #####
-        # ## rel_base_pts_to_pert_rhand_joints, rel_base_pts_to_rhand_joints ##
-        # ## dist_base_pts_to_pert_rhand_joints, dist_base_pts_to_rhand_joints ##
-        # rel_base_pts_to_pert_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        # # 
-        # dist_base_pts_to_pert_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_pert_rhand_joints, dim=-1)
-        
-        # tot_finger_rt_dist_pts_idxes = []
-        # # tot_finger_rt_dist_pts_idxes_clean = []
-        # joints_to_finger_idx = torch.zeros((pert_rhand_joints.size(1)), dtype=torch.long)
-        # for i_finger in range(6):
-        #     if i_finger < 5:
-        #         cur_finger_rt_dist = torch.abs(dist_base_pts_to_pert_rhand_joints[:, self.fingers_stats[i_finger][3], :])
-        #         # cur_finger_rt_dist_clean = torch.abs(dist_base_pts_to_pert_rhand_joints[:, self.fingers_stats[i_finger][3], :])
-        #         for cur_jt in self.fingers_stats[i_finger][:-1]:
-        #             joints_to_finger_idx[cur_jt] = i_finger
-        #     else:
-        #         cur_finger_rt_dist = torch.abs(dist_base_pts_to_pert_rhand_joints[:, 0, :])
-        #         joints_to_finger_idx[0] = i_finger
-        #     _, cur_finger_rt_dist_pts_idx = torch.min(cur_finger_rt_dist, dim=-1) # ws
-        #     tot_finger_rt_dist_pts_idxes.append(cur_finger_rt_dist_pts_idx)
-        # tot_finger_rt_dist_pts_idxes = torch.stack(tot_finger_rt_dist_pts_idxes, dim=-1) # ws x 6
-        # joints_to_finger_idx = joints_to_finger_idx.unsqueeze(0).repeat(pert_rhand_joints.size(0), 1) # ws x nn_joints
-        # # ws x nn_joints
-        # pert_joints_to_base_pts_idx = utils.batched_index_select_ours(tot_finger_rt_dist_pts_idxes, joints_to_finger_idx, dim=1)
-        # # ws x nn_joints
-        # selected_base_to_pert_joints_dist = utils.batched_index_select_ours(dist_base_pts_to_pert_rhand_joints, pert_joints_to_base_pts_idx.unsqueeze(-1), dim=2).squeeze(-1)
-        
-        # ### dist_base_pts_to_pert_rhand_joints, selected_base_to_pert_joints_dist ###
-        # ### dist_base_pts_to_rhand_joints, selected_base_to_joints_dist ###
-        # # nf x nnj x 1 x 3 - 1 x 1 x nnb x 3
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        # dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        # tot_finger_rt_dist_pts_idxes = []
-        # for i_finger in range(6):
-        #     if i_finger < 5:
-        #         cur_finger_rt_dist = torch.abs(dist_base_pts_to_rhand_joints[:, self.fingers_stats[i_finger][3], :])
-        #     else:
-        #         cur_finger_rt_dist = torch.abs(dist_base_pts_to_rhand_joints[:, 0, :])
-        #     _, cur_finger_rt_dist_pts_idx = torch.min(cur_finger_rt_dist, dim=-1) # ws
-        #     tot_finger_rt_dist_pts_idxes.append(cur_finger_rt_dist_pts_idx)
-        # tot_finger_rt_dist_pts_idxes = torch.stack(tot_finger_rt_dist_pts_idxes, dim=-1) # ws x 6 
-        # ## with predicted distances, we get crresponding points ##
-        # ## joints_to_base_pts_idx: ws x nn_joints to select base_pts_idx ##
-        # joints_to_base_pts_idx = utils.batched_index_select_ours(tot_finger_rt_dist_pts_idxes, joints_to_finger_idx, dim=1)
-        # selected_base_to_joints_dist = utils.batched_index_select_ours(dist_base_pts_to_rhand_joints, joints_to_base_pts_idx.unsqueeze(-1), dim=2).squeeze(-1)
-        # ##### ===== calculate relative positions, distances, directions ====== #####
-        
-        # ### relative base pts to rhand joints ###
-        # # nf x nn_joints x nn_base_pts ##
-        # l2_dist_base_pts_to_rhand_joints = torch.norm(rel_base_pts_to_rhand_joints, p=2, dim=-1, keepdim=True)
-        # affinity_base_pts_to_rhand_joints = 0.5 * torch.cos(
-        #     torch.pi / 0.02 * l2_dist_base_pts_to_rhand_joints
-        # ) + 0.5
-        # affinity_base_pts_to_rhand_joints[l2_dist_base_pts_to_rhand_joints > 0.02] = 0.
-        
-        
-        
-        
-        # if self.aug:
-        #     # print(f"Using rotation augmentation...")
-        #     object_pc_, R = random_rotate_np(object_pc)
-        #     R_th = torch.from_numpy(R).float()
-            
-        #     ## rel_base_pts_to_pert_rhand_joints, rel_base_pts_to_rhand_joints: ws x nn_joints x nn_samples x 3 ##
-        #     ## dist_base_pts_to_pert_rhand_joints, dist_base_pts_to_rhand_joints ##
-            
-        #     # dir_base_pts_to_rhand_joints: ws x nn_base_pts x nn_joints x 3
-        #     # object_normal = np.matmul(object_normal, R) ### but
-        #     if self.canon_obj:
-        #         # print(f'reverse_trans_base_pts: {reverse_trans_base_pts.size()}, reverse_trans_pert_rhand_verts_th: {reverse_trans_pert_rhand_verts_th.size()}, reverse_trans_rhand_verts_th: {reverse_trans_rhand_verts_th.size()}')
-        #         ## transl, pose, beta --> and their relations with the global inverse transformation ##
-        #         avg_reverse_trans_base_pts = base_pts.mean(dim=0, keepdim=True)
-        #         ### nn_base_pts x 3 xxxxx 3 x 3 --> nn_base_pts x 3 ###
-        #         base_pts = torch.matmul(base_pts - avg_reverse_trans_base_pts, R_th)
-        #         base_normals = torch.matmul(base_normals, R_th)
-        #         if self.dir_stra == "rot_angles":
-        #             tangent_orient_vec = torch.matmul(tangent_orient_vec, R_th)
-        #         #### Transform pert_rhand_verts, rhand_verts ####
-        #         # reverse_trans_pert_rhand_verts_th, reverse_trans_rhand_verts_th #
-        #         pert_rhand_verts = torch.matmul(
-        #             pert_rhand_verts - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #         rhand_verts = torch.matmul(
-        #             rhand_verts - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #         # # reverse_trans_pert_rhand_joints_th, reverse_trans_rhand_joints_th #
-        #         pert_rhand_joints = torch.matmul( ## same for each frame? ## R_th.unsqueeze(0) #
-        #             pert_rhand_joints - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #         rhand_joints = torch.matmul(
-        #             rhand_joints - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #         #### Transform pert_rhand_verts, rhand_verts ####
-        #     else:
-        #         avg_reverse_trans_base_pts = base_pts.mean(dim=0, keepdim=True)
-        #         #### Rotate base pts and base normals ###
-        #         base_pts = torch.matmul(base_pts - avg_reverse_trans_base_pts, R_th)
-        #         base_normals = torch.matmul(base_normals, R_th)
-                
-        #         pert_rhand_verts = torch.matmul(
-        #             pert_rhand_verts - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #         rhand_verts = torch.matmul(
-        #             rhand_verts - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-                
-        #         pert_rhand_joints = torch.matmul(
-        #             pert_rhand_joints - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #         rhand_joints = torch.matmul(
-        #             rhand_joints - avg_reverse_trans_base_pts.unsqueeze(0), R_th.unsqueeze(0)
-        #         )
-        #     ## (rhand_joints = trans_canonicalized_rhand_joints + trans) ##
-        #     ## mlp encoder for trranslations and ... for communications and ... for decoding absolute / global translations ##
-        #     ## rhand_joints * joints_scale_up = (trans_canoncialized_joints * joints_scale_up + trans * joints_scale_up) ##
-        #     rel_base_pts_to_pert_rhand_joints = torch.matmul(
-        #         rel_base_pts_to_pert_rhand_joints, R_th.unsqueeze(0).unsqueeze(0)
-        #     )
-        #     rel_base_pts_to_rhand_joints = torch.matmul(
-        #         rel_base_pts_to_rhand_joints, R_th.unsqueeze(0).unsqueeze(0)
-        #     )
-            
-        #     ### Get canoncialized pert rhand joints ###
-        #     ## # trans_canon_pert_rhand_joints, trans_canon_rhand_joints # ##
-        #     trans_canon_pert_rhand_joints = torch.matmul(
-        #         trans_canon_pert_rhand_joints, R_th.unsqueeze(0)
-        #     )
-        #     trans_canon_rhand_joints = torch.matmul(
-        #         trans_canon_rhand_joints, R_th.unsqueeze(0)
-        #     )
-            
-        #     # if not self.dir_stra == "rot_angles": ### shold transform along the directions ###
-        #     #     dir_base_pts_to_rhand_joints = torch.matmul(dir_base_pts_to_rhand_joints, R_th.unsqueeze(0).unsqueeze(0))
-        #     #     dir_base_pts_to_pert_rhand_joints = torch.matmul(dir_base_pts_to_pert_rhand_joints, R_th.unsqueeze(0).unsqueeze(0))
-        #     # rel_base_pts_to_pert_rhand_joints = torch.matmul(rel_base_pts_to_pert_rhand_joints, R_th.unsqueeze(0).unsqueeze(0))
-        #     # rel_base_pts_to_rhand_joints = torch.matmul(rel_base_pts_to_rhand_joints, R_th.unsqueeze(0).unsqueeze(0))
-        #     ## 
-        #     # relative base pts to rhand joints; 
-        #     # the projected joints should satisfy the barrier function --- how to project joints #
-        #     # former frames, current frame --> motion regularization #
-        #     # the denoised relative position should serve as a way of projecting joints for next frames #
-
-        # rt_pert_rhand_verts =  pert_rhand_verts
-        # rt_rhand_verts = rhand_verts
-        # rt_pert_rhand_joints = pert_rhand_joints
-        # rt_rhand_joints = rhand_joints
-        rt_rhand_joints = pert_rhand_joints
-        
-        ''' Joints mean and std -> strategy 1 '''
-        # # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-        ''' Joints mean and std -> strategy 1 '''
-        
-        
-        ''' Joints mean and std -> strategy 3 '''
-        # self.avg_jts, self.std_jts #
-        if self.inst_normalization:
-            # if self.args.debug:
-            #     print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-            pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
-            rhand_joints = (rhand_joints - self.avg_jts) / self.std_jts
-            rt_rhand_joints = (rt_rhand_joints - self.avg_jts) / self.std_jts
-            avg_joints = self.avg_jts
-            std_joints = self.std_jts
-        ''' Joints mean and std -> strategy 3 '''
-            
-        
-        ## rhand_joints ##
-        motion = rt_rhand_joints
-        m_length = self.window_size
-        caption = "a person sits down and shakes an object in his right hand."
-        tokens = "a/DET person/NOUN sit/VERB down/ADP and/CCONJ shake/VERB an/DET object/NOUN in/ADP his/DET right/ADJ hand/NOUN"
-        
-        # object_name; caption, and tokens #
-        caption = f"{object_name}"
-        tokens = f"{object_name}/NOUN" ## tokens 
-        
-        tokens = tokens.split(" ")
-        max_text_len = 20
-        if len(tokens) < max_text_len:
-            # pad with "unk"
-            tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
-            sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (max_text_len + 2 - sent_len)
-        else:
-            # crop
-            tokens = tokens[:max_text_len]
-            tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
-            sent_len = len(tokens)
-        pos_one_hots = [] ## pose one hots ##
-        word_embeddings = []
-        for token in tokens:
-            word_emb, pos_oh = self.w_vectorizer[token]
-            pos_one_hots.append(pos_oh[None, :])
-            word_embeddings.append(word_emb[None, :])
-        pos_one_hots = np.concatenate(pos_one_hots, axis=0)
-        word_embeddings = np.concatenate(word_embeddings, axis=0)
-        # pose_one_hots, word_embeddings #
-        
-        # object_global_orient_th, object_transl_th #
-        object_global_orient_th = torch.from_numpy(object_global_orient).float()
-        object_transl_th = torch.from_numpy(object_transl).float()
-        
-        ## avg_joints : 1 x 3, std_joints: 1 ## 
-        rt_dict = {
-          'word_embeddings': word_embeddings,
-          'pos_one_hots': pos_one_hots,
-          'caption': caption,
-          'sent_len': sent_len,
-          'motion': motion,
-          'm_length': m_length,
-          'tokens': '_'.join(tokens),
-          'st_idx': st_idx, 
-          'ed_idx': ed_idx,
-          'pert_verts': pert_rhand_verts, 
-          'verts': rhand_verts,
-          'avg_joints': avg_joints,
-          'std_joints': std_joints,
-          'object_id': object_id, # int value
-          'object_global_orient': object_global_orient_th,
-          'object_transl': object_transl_th,
-        }
-        
-        return rt_dict
-
-
-        
-        rt_dict = {
-            ## TODO: should use object rotations to canonicalize those value as well ##
-            ## # trans_canon_pert_rhand_joints, trans_canon_rhand_joints # ##
-            ## trans canon pert rhand joints ##
-            ## trans canon pert rhand joints ##
-            'canon_pert_rhand_joints': canon_pert_rhand_joints,
-            'canon_rhand_joints': canon_rhand_joints,
-            ### trans_canon_pert_rhand_joints, trans_canon_rhand_joints ###
-            'trans_canon_pert_rhand_joints': trans_canon_pert_rhand_joints.numpy(),
-            'trans_canon_rhand_joints': trans_canon_rhand_joints.numpy(),
-            # 'canon_pert_rhand_joints': canon_pert_rhand_joints,
-            # 'canon_rhand_joints': canon_rhand_joints,
-            'pert_rhand_joints': rt_pert_rhand_joints.numpy(),
-            'rhand_joints': rt_rhand_joints.numpy(),
-            # 'rhand_global_orient': rhand_global_orient_var, # ws x 3
-            # 'pert_rhand_global_orient': pert_rhand_global_orient_var, # ws x 3
-            # 'tips_feats': tips_feats,
-            # 'pert_tips_feats': pert_tips_feats,
-            # # reverse_trans_pert_rhand_verts_th, reverse_trans_rhand_verts_th #
-            'pert_rhand_verts': rt_pert_rhand_verts,
-            'rhand_verts': rt_rhand_verts,
-            
-            # pert_rhand_betas_var, rhand_beta_var
-            'pert_rhand_betas_var': pert_rhand_betas_var.numpy(),
-            'rhand_beta_var': rhand_beta_var.numpy(),
-            
-            # pert_rhand_pose_var, rhand_pose_var
-            'pert_rhand_theta': pert_rhand_pose_var.numpy(),
-            'rhand_theta': rhand_pose_var.numpy(),
-            
-            ### ws x 3; ws x psoe_dim; ws x 3 ##3
-            ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-            ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-            'pert_rhand_rot': pert_rhand_global_orient_var.numpy(), # ws x 3 #
-            'rhand_rot': rhand_global_orient_var.numpy(),
-            
-            'pert_rhand_transl': pert_rhand_transl_var.numpy(),
-            'rhand_transl': rhand_transl_var.numpy(),
-            
-            
-            ### dist_base_pts_to_pert_rhand_joints, selected_base_to_pert_joints_dist ###
-            ### dist_base_pts_to_rhand_joints, selected_base_to_joints_dist ### ##
-            'dist_base_pts_to_pert_rhand_joints': dist_base_pts_to_pert_rhand_joints.numpy(),
-            'selected_base_to_pert_joints_dist': selected_base_to_pert_joints_dist.numpy(),
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints.numpy(),
-            'selected_base_to_joints_dist': selected_base_to_joints_dist.numpy(),
-            'rel_base_pts_to_pert_rhand_joints': rel_base_pts_to_pert_rhand_joints.numpy(),
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints.numpy(),
-            
-            # 'canon_tips_feats': canon_tips_feats,
-            # 'canon_pert_tips_feats': canon_pert_tips_feats,
-            # 'canon_joints': canon_joints,
-            
-            ### 100 verts, normals and pts, relative distances to joints ###
-            'base_pts': base_pts.numpy(), # base_sampling x 3
-            'base_normals': base_normals.numpy(), # base_sampling x 3 for the normals #
-            ### dir and distances ###
-            # 't': torch.tensor([float(cur_t) / float(self.num_sche_steps) * 0.02], dtype=torch.float32),
-            't': torch.tensor([float(cur_t) / float(self.num_sche_steps) * np.pi], dtype=torch.float32),
-            ## current timestamp ##
-            'int_t': torch.tensor([cur_t], dtype=torch.long),
-            # aug_trans, aug_rot, aug_pose #
-            'aug_trans': torch.tensor([aug_trans], dtype=torch.float32),
-            'aug_rot': torch.tensor([aug_rot], dtype=torch.float32),
-            'aug_pose': torch.tensor([aug_pose], dtype=torch.float32),
-            
-            'affinity_base_pts_to_rhand_joints': affinity_base_pts_to_rhand_joints.numpy(),
-            # 'dir_base_pts_to_rhand_joints': dir_base_pts_to_rhand_joints.numpy(),
-            # 'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints.numpy(),
-            # 'dir_base_pts_to_pert_rhand_joints': dir_base_pts_to_pert_rhand_joints.numpy(),
-            # 'dist_base_pts_to_pert_rhand_joints': dist_base_pts_to_pert_rhand_joints.numpy(),
-            
-            # 'rel_base_pts_to_pert_rhand_joints': rel_base_pts_to_pert_rhand_joints.numpy(),
-            # 'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints.numpy(), 
-            # # affinity_base_pts_to_pert_rhand_joints, affinity_base_pts_to_rhand_joints 
-            # 'affinity_base_pts_to_pert_rhand_joints': affinity_base_pts_to_pert_rhand_joints.numpy(),
-            # 'affinity_base_pts_to_rhand_joints': affinity_base_pts_to_rhand_joints.numpy(),
-        }
-        
-        
-        if self.dir_stra == 'rot_angles':
-            # tangent_orient_vec # nn_base_pts x 3 #
-            rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
-        
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
-
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
-
-    def __len__(self):
-        cur_len = self.len // self.step_size
-        if cur_len * self.step_size < self.len:
-          cur_len += 1
-        return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
+from utils.anchor_utils import masking_load_driver, anchor_load_driver, recover_anchor_batch
 
 
 
-class GRAB_Dataset_V17(torch.utils.data.Dataset):
-    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
-        #### GRAB dataset #### ## GRAB dataset
-        self.clips = []
-        self.len = 0
-        self.window_size = window_size
-        self.step_size = step_size
-        self.num_points = num_points
-        self.split = split
-        
-        split = args.single_seq_path.split("/")[-2].split("_")[0]
-        self.split = split
-        print(f"split: {self.split}")
-        
-        self.model_type = 'v1_wsubj_wjointsv25'
-        self.debug = False
-        # self.use_ambient_base_pts = args.use_ambient_base_pts
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        self.num_sche_steps = 100
-        self.w_vectorizer = w_vectorizer
-        self.use_pert = True
-        self.use_rnd_aug_hand = True
-        
-        self.args = args
-        
-        self.denoising_stra = args.denoising_stra ## denoising_stra!
-        
-        self.seq_path = args.single_seq_path ## single seq path ##
-        
-        self.inst_normalization = args.inst_normalization
-        
-        
-        # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
-        
-        
-        
-        self.aug_trans_T = 0.05
-        self.aug_rot_T = 0.3
-        self.aug_pose_T = 0.5
-        self.aug_zero = 1e-4 if self.model_type not in ['v1_wsubj_wjointsv24', 'v1_wsubj_wjointsv25'] else 0.01
-        
-        self.sigmas_trans = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_trans_T), self.num_sche_steps
-        ))
-        self.sigmas_rot = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_rot_T), self.num_sche_steps
-        ))
-        self.sigmas_pose = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_pose_T), self.num_sche_steps
-        ))
-        
-        
-        self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
-        # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
-        self.aug = True
-        self.use_anchors = False
-        # self.args = args
-        
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmesh = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        for i, fn in enumerate(obj_meshes):
-            id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        self.id2objmesh = id2objmesh
-        self.id2meshdata = {}
-        
-        ## obj root folder; ##
-        ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
-        
-        ''' Load avg, std statistics '''
-        # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
-        rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
-        rel_dists_stats = np.load(rel_dists_stats_fn, allow_pickle=True).item()
-        maxx_rel = rel_dists_stats['maxx_rel']
-        minn_rel = rel_dists_stats['minn_rel']
-        maxx_dists = rel_dists_stats['maxx_dists']
-        minn_dists = rel_dists_stats['minn_dists']
-        self.maxx_rel = torch.from_numpy(maxx_rel).float()
-        self.minn_rel = torch.from_numpy(minn_rel).float()
-        self.maxx_dists = torch.from_numpy(maxx_dists).float()
-        self.minn_dists = torch.from_numpy(minn_dists).float()
-        ''' Load avg, std statistics '''
-        
-        ''' Load avg-jts, std-jts '''
-        avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
-        std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
-        avg_jts = np.load(avg_jts_fn, allow_pickle=True)
-        std_jts = np.load(std_jts_fn, allow_pickle=True)
-        # self.avg_jts, self.std_jts #
-        self.avg_jts = torch.from_numpy(avg_jts).float()
-        self.std_jts = torch.from_numpy(std_jts).float()
-        ''' Load avg-jts, std-jts '''
-        
-        
-        # self.dist_stra = args.dist_stra
-        
-        self.load_meta = True
-        
-        self.dist_threshold = 0.005
-        self.nn_base_pts = 700
-        
-        mano_pkl_path = os.path.join(self.mano_path, 'MANO_RIGHT.pkl')
-        with open(mano_pkl_path, 'rb') as f:
-            mano_model = pickle.load(f, encoding='latin1')
-        self.template_verts = np.array(mano_model['v_template'])
-        self.template_faces = np.array(mano_model['f'])
-        self.template_joints = np.array(mano_model['J'])
-        #### finger tips; ####
-        self.template_tips = self.template_verts[[745, 317, 444, 556, 673]]
-        self.template_joints = np.concatenate([self.template_joints, self.template_tips], axis=0)
-        #### template verts ####
-        self.template_verts = self.template_verts * 0.001
-        #### template joints ####
-        self.template_joints = self.template_joints * 0.001 # nn_joints x 3 #
-        # condition on template joints for current joints #
-        
-        # self.template_joints = self.template_verts[self.hand_palm_vertex_mask]
-        
-        self.fingers_stats = [
-            [16, 15, 14, 13, 0],
-            [17, 3, 2, 1, 0],
-            [18, 6, 5, 4, 0],
-            [19, 12, 11, 10, 0],
-            [20, 9, 8, 7, 0]
-        ]
-        # 5 x 5 states, the first dimension is the finger index
-        self.fingers_stats = np.array(self.fingers_stats, dtype=np.int32)
-        self.canon_obj = True
-        
-        self.dir_stra = "vecs" # "rot_angles", "vecs"
-        # self.dir_stra = "rot_angles"
-        
-        
-        self.mano_layer = ManoLayer(
-            flat_hand_mean=True,
-            side='right',
-            mano_root=self.mano_path, # mano_root #
-            ncomps=24,
-            use_pca=True,
-            root_rot_mode='axisang',
-            joint_rot_mode='axisang'
-        )
-        
-        ## actions taken 
-        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
-        # os.makedirs(self.clip_sv_folder, exist_ok=True)
-
-        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
-        # #### filter files_clean here ####
-        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
-        
-        files_clean = [self.seq_path]
-        
-        if self.load_meta:
-          
-            for i_f, f in enumerate(files_clean): ### train, val, test clip, clip_len ###
-            # for 
-                # if split != 'train' and split != 'val' and i_f >= 100:
-                #     break
-                # if split == 'train':
-                    # print(f"loading {i_f} / {len(files_clean)}")
-                print(f"loading {i_f} / {len(files_clean)}")
-                base_nm_f = os.path.basename(f)
-                base_name_f = base_nm_f.split(".")[0]
-                cur_clip_meta_data_sv_fn = f"{base_name_f}_meta_data.npy"
-                cur_clip_meta_data_sv_fn = os.path.join(data_folder, split, cur_clip_meta_data_sv_fn)
-                cur_clip_meta_data = np.load(cur_clip_meta_data_sv_fn, allow_pickle=True).item()
-                cur_clip_len = cur_clip_meta_data['clip_len']
-                # clip_len = (cur_clip_len - window_size) // step_size + 1
-                # clip_len = cur_clip_len
-                
-                self.clips.append(self.load_clip_data(i_f, f=f)) ## add current clip ##
-                # self.clips.append((self.len, self.len+clip_len,  f
-                #     ))
-                clip_len = self.clips[i_f][3][3].shape[0]
-                self.len += clip_len # len clip len
-                self.len = 81
-                
-        else:
-            for i_f, f in enumerate(files_clean):
-                if split == 'train':
-                    print(f"loading {i_f} / {len(files_clean)}")
-                if split != 'train' and i_f >= 100:
-                    break
-                if args is not None and args.debug and i_f >= 10:
-                    break
-                clip_clean = np.load(f)
-                pert_folder_nm = split + '_pert'
-                if args is not None and not args.use_pert:
-                    pert_folder_nm = split
-                clip_pert = np.load(os.path.join(data_folder, pert_folder_nm, os.path.basename(f)))
-                clip_len = (len(clip_clean) - window_size) // step_size + 1
-                sv_clip_pert = {}
-                for i_idx in range(6):
-                    sv_clip_pert[f'f{i_idx + 1}'] = clip_pert[f'f{i_idx + 1}']
-                
-                ### sv clip pert, 
-                ##### load subj params #####
-                pure_file_name = f.split("/")[-1].split(".")[0]
-                pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                        
-                subj_params_fn = os.path.join(self.subj_data_folder, split, pure_subj_params_fn)
-                subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-                rhand_transl = subj_params["rhand_transl"]
-                rhand_betas = subj_params["rhand_betas"]
-                rhand_pose = clip_clean['f2'] ## rhand pose ##
-                
-                pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-                pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-                ##### load subj params #####
-                
-                # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-                # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-                ### pert and clean pair for encoding and decoding ###
-                self.clips.append((self.len, self.len+clip_len, clip_pert,
-                    [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                    # subj_corr_data, pert_subj_corr_data
-                    ))
-                # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
-                #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                #     # subj_corr_data, pert_subj_corr_data
-                #     ))
-                self.len += clip_len # len clip len
-        self.clips.sort(key=lambda x: x[0])
-    
-    def uinform_sample_t(self):
-        t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
-        return t
-    
-    def load_clip_data(self, clip_idx, f=None):
-        if f is None:
-          cur_clip = self.clips[clip_idx]
-          if len(cur_clip) > 3:
-              return cur_clip
-          f = cur_clip[2]
-        clip_clean = np.load(f)
-        # pert_folder_nm = self.split + '_pert'
-        pert_folder_nm = self.split
-        # if not self.use_pert:
-        #     pert_folder_nm = self.split
-        # clip_pert = np.load(os.path.join(self.data_folder, pert_folder_nm, os.path.basename(f)))
-        
-        
-        ##### load subj params #####
-        pure_file_name = f.split("/")[-1].split(".")[0]
-        pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                
-        subj_params_fn = os.path.join(self.subj_data_folder, self.split, pure_subj_params_fn)
-        subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-        rhand_transl = subj_params["rhand_transl"]
-        rhand_betas = subj_params["rhand_betas"]
-        rhand_pose = clip_clean['f2'] ## rhand pose ##
-        
-        object_global_orient = clip_clean['f5'] ## clip_len x 3 --> orientation 
-        object_trcansl = clip_clean['f6'] ## cliplen x 3 --> translation
-        
-        object_idx = clip_clean['f7'][0].item()
-        
-        pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-        pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        ##### load subj params #####
-        
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
-        # maxx_clip_len = 
-        loaded_clip = (
-            0, rhand_transl.shape[0], clip_clean,
-            [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
-        )
-        # self.clips[clip_idx] = loaded_clip
-        
-        return loaded_clip
-        
-        # self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #     # subj_corr_data, pert_subj_corr_data
-        #     ))
-        
-    def get_idx_to_mesh_data(self, obj_id):
-        if obj_id not in self.id2meshdata:
-            obj_nm = self.id2objmesh[obj_id]
-            obj_mesh = trimesh.load(obj_nm, process=False)
-            obj_verts = np.array(obj_mesh.vertices)
-            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-            obj_faces = np.array(obj_mesh.faces)
-            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
-        return self.id2meshdata[obj_id]
-
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
-    def __getitem__(self, index):
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        i_c = 0
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
-
-        object_id = c[3][-1]
-        object_name = self.id2objmeshname[object_id]
-        
-        start_idx = index * self.step_size
-        if start_idx + self.window_size > self.len:
-            start_idx = self.len - self.window_size
-            
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        
-        data = c[2][start_idx:start_idx+self.window_size]
-        # # object_global_orient = self.data[index]['f5']
-        # # object_transl = self.data[index]['f6'] #
-        # object_global_orient = data['f5'] ### get object global orientations ###
-        # object_trcansl = data['f6']
-        # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        object_global_orient = c[3][-3] # num_frames x 3 
-        object_transl = c[3][-2] # num_frames x 3
-        
-        
-        # object_global_orient, object_transl #
-        object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        object_transl = object_transl[start_idx: start_idx + self.window_size]
-        object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        object_trcansl_th = torch.from_numpy(object_transl).float()
-        
-        # pert_subj_params = c[4]
-        
-        st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx
-        
-        ### pts gt ###
-        ## rhnad pose, rhand pose gt ##
-        ## glboal orientation and hand pose #
-        rhand_global_orient_gt, rhand_pose_gt = c[3][3], c[3][4]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-        rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-        rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-        
-        rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-        rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-        
-        rhand_transl, rhand_betas = c[3][5], c[3][6]
-        rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas
-        
-        # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-        rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-        rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
-        
-        # # orientation rotation matrix #
-        # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
-        # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
-        # # orientation rotation matrix #
-        
-        rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
-        rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
-        rhand_beta_var = torch.from_numpy(rhand_betas).float()
-        rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
-        # R.from_rotvec(obj_rot).as_matrix()
-        
-        ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
-        #### ==== get random augmented pose, rot, transl ==== ####
-        # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
-        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # ### === get and save noise vectors === ###
-        # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
-        aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
-        aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
-        aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
-        # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
-        # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
-        # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
-        # ### creat augmneted orientations, pose, and transl ###
-        rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
-        rnd_aug_pose_var = rhand_pose_var + aug_pose_var
-        rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
-        
-        
-        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_betas_var, rhand_beta_var
-        rhand_verts, rhand_joints = self.mano_layer(
-            torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
-        )
-        ### rhand_joints: for joints ###
-        rhand_verts = rhand_verts * 0.001
-        rhand_joints = rhand_joints * 0.001
-         
-        # self.anchor_face_vertex_index = fvi
-        #     self.anchor_weight = aw
-        
-        ### Get palm verts ###
-        # palm_verts = rhand_verts[:, self.hand_palm_vertex_mask, :]
-
-        # rhand_joints_gt = rhand_joints.numpy() # num_frams x 21 x 3 #
-        # rhand_verts_gt = rhand_verts.numpy()
-        
-        # ### Get cannonical rhandjoints ###
-        # canon_rhand_verts, canon_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(rhand_global_orient_var), rhand_pose_var], dim=-1), 
-        #     rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(rhand_transl_var)
-        # )
-        # canon_rhand_joints = canon_rhand_joints * 0.001
-        # canon_rhand_verts = canon_rhand_verts * 0.001
-        # ### Get cannonical rhandjoints ###
-        
-        
-        # ### Get cannonical rhandjoints ###
-        # trans_canon_rhand_verts, trans_canon_rhand_joints = self.mano_layer(
-        #     torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1), 
-        #     rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(rhand_transl_var)
-        # )
-        # trans_canon_rhand_joints = trans_canon_rhand_joints * 0.001
-        # trans_canon_rhand_verts = trans_canon_rhand_verts * 0.001
-        ### Get cannonical rhandjoints ###
-        ### Canonical finger stats ###
-        # finger_stats = self.fingers_stats
-        # canon_tips = canon_rhand_joints.numpy()[:, finger_stats[:, 0]] # num_frams x 5 x 3
-        # canon_other_joint = canon_rhand_joints.numpy()[:, finger_stats[:, 1:]] # num_frams x 5 x 4 x 3
-        # canon_tips_to_other_joints = canon_other_joint - np.reshape(canon_tips, (canon_tips.shape[0], canon_tips.shape[1], 1, 3)) # num_frams x 5 x 4 x 3
-        # # tips_feats: nf x 5 x (3 + 4 * 3) = nf x 5 x 15 #
-        # canon_tips_feats = np.concatenate(
-        #     [canon_tips, canon_tips_to_other_joints.reshape(canon_tips.shape[0], canon_tips.shape[1], -1)], axis=-1
-        # ) ### 
-        ### Canonical finger stats ###
-        
-        # ### Get pert rhand pose, orientation, betas, transl, joints and verts ###
-        # pert_rhand_global_orient = data['f1'].reshape(self.window_size, 3).astype(np.float32)
-        # pert_rhand_pose = data['f2'].reshape(self.window_size, -1).astype(np.float32)
-        # pert_rhand_betas = pert_subj_params['rhand_betas'].reshape(-1).astype(np.float32)
-        # pert_rhand_transl = pert_subj_params['rhand_transl'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # ##### Get pert rhand vertices and joints #####
-        # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient)
-        # pert_rhand_global_orient_mtx_var = torch.from_numpy(pert_rhand_global_orient_mtx).float()
-        
-        # pert_rhand_global_orient_var = torch.from_numpy(pert_rhand_global_orient).float()
-        # pert_rhand_pose_var = torch.from_numpy(pert_rhand_pose).float()
-        # pert_rhand_betas_var = torch.from_numpy(pert_rhand_betas).float()
-        # pert_rhand_transl_var = torch.from_numpy(pert_rhand_transl).float()
-        
-        
-        # ### ws x 3; ws x psoe_dim; ws x 3 ##3
-        # ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        # ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-        if self.use_rnd_aug_hand: ## rnd aug pose var, transl var #
-            # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-            pert_rhand_global_orient_var = rnd_aug_global_orient_var.clone()
-            pert_rhand_pose_var = rnd_aug_pose_var.clone()
-            pert_rhand_transl_var = rnd_aug_transl_var.clone()
-            # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient_var.numpy())
-        
-        # # pert_rhand_betas_var
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_joints --> for rhand joints in the camera frmae ###
-        pert_rhand_verts, pert_rhand_joints = self.mano_layer(
-            torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), pert_rhand_transl_var
-        )
-        pert_rhand_verts = pert_rhand_verts * 0.001 # verts 
-        pert_rhand_joints = pert_rhand_joints * 0.001 # joints
-        
-        
-        
-        # canon_pert_rhand_verts, canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
-        # canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
-        
-        # ### trans_canon_pert_rhand_joints, trans_canon_rhand_joints ###
-        # trans_canon_pert_rhand_verts, trans_canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # trans_canon_pert_rhand_verts = trans_canon_pert_rhand_verts * 0.001 # verts 
-        # trans_canon_pert_rhand_joints = trans_canon_pert_rhand_joints * 0.001 # joints
-        
-        
-        
-        
-        # ### Relative positions from base points to rhand joints ###
-        object_pc = data['f3'].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_normal = data['f4'].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
-        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
-        
-        
-        # base_pts_feats_sv_dict = {}
-        #### distance between rhand joints and obj pcs ####
-        # pert_rhand_joints_th = pert_rhand_joints
-        # ws x nnjoints x nnobjpts #
-        dist_rhand_joints_to_obj_pc = torch.sum(
-            (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        )
-        # dist_pert_rhand_joints_obj_pc = torch.sum(
-        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        # )
-        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
-        
-        object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
-        # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-        dist_object_pc_nearest_pcs = torch.sum(
-            (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1
-        )
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
-        # # dist_threshold = 0.01
-        dist_threshold = self.dist_threshold
-        # # dist_threshold for pc_nearest_pcs #
-        dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-        
-        # # base_pts_mask: nn_obj_pcs #
-        base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
-        # # nn_base_pts x 3 -> torch tensor #
-        base_pts = object_pc_th[0][base_pts_mask]
-        # # base_pts_bf_sampling = base_pts.clone()
-        base_normals = object_normal_th[0][base_pts_mask]
-        
-        nn_base_pts = self.nn_base_pts
-        base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
-        base_pts_idxes = base_pts_idxes[:nn_base_pts]
-        # if self.debug:
-        #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # ### get base points ### # base_pts and base_normals #
-        base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
-        base_normals = base_normals[base_pts_idxes]
-        
-        
-        # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        base_pts_transl = object_trcansl_th[0] # 3
-        
-        # if self.dir_stra == "rot_angles": ## rot angles ##
-        #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # if self.canon_obj:
-            ## reverse transform base points ###
-            ## canonicalize base points and base normals ###
-        base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-            ) # .transpose(0, 1)
-        base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-            ) # .transpose(0, 1)
-        
-        
-        rhand_joints = torch.matmul(
-            rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        pert_rhand_joints = torch.matmul(
-            pert_rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        ''' normalization strategy xxx --- data scaling '''
-        # base_pts = base_pts * 5.
-        # rhand_joints = rhand_joints * 5.
-        ''' Normlization stratey xxx --- data scaling '''
-        
-        
-         
-        # base_pts_mean = base_pts.mean(dim=0, keepdim=True)
-        # base_pts = base_pts - base_pts_mean
-        # base_pts_maxx, _ = torch.max(base_pts, dim=0)
-        # base_pts_minn, _ = torch.min(base_pts, dim=0)
-        # scale = torch.sqrt(((base_pts_maxx - base_pts_minn) ** 2).sum(dim=-1, keepdim=True)) # 1 x 1
-        
-        # rhand_joints = (rhand_joints - )
-        
-
-        # nf x nnj x nnb x 3 # 
-        rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        if self.denoising_stra == "rep":
-            ''' Relative positions and distances normalization, strategy 3 '''
-            # # for each point normalize joints over all frames #
-            # # rel_base_pts_to_rhand_joints: nf x nnj x nnb x 3 #
-            per_frame_avg_joints_rel = torch.mean(
-                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_std_joints_rel = torch.std(
-                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_avg_joints_dists_rel = torch.mean(
-                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_std_joints_dists_rel = torch.std(
-                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            # max xyz vlaues for the relative positions, maximum, minimum distances for them #
-            
-            ''' Stra 2 -> per frame with joints '''
-            # # nf x nnj x nnb x 3 #
-            # ws, nnf , nnb = rel_base_pts_to_rhand_joints.shape[:3]
-            # per_frame_avg_joints_rel = torch.mean(
-            #     rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True # for each point #
-            # ).unsqueeze(0)
-            # per_frame_std_joints_rel = torch.std(
-            #     rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            # per_frame_avg_joints_dists_rel = torch.mean(
-            #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            # per_frame_std_joints_dists_rel = torch.std(
-            #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            
-            # # nf x nnj x nnb x 3 # 
-            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-            # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-            dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-            
-            rel_base_pts_to_rhand_joints = (rel_base_pts_to_rhand_joints - per_frame_avg_joints_rel) / per_frame_std_joints_rel
-            dist_base_pts_to_rhand_joints = (dist_base_pts_to_rhand_joints - per_frame_avg_joints_dists_rel) / per_frame_std_joints_dists_rel
-            stats_dict = {
-                'per_frame_avg_joints_rel': per_frame_avg_joints_rel,
-                'per_frame_std_joints_rel': per_frame_std_joints_rel,
-                'per_frame_avg_joints_dists_rel': per_frame_avg_joints_dists_rel,
-                'per_frame_std_joints_dists_rel': per_frame_std_joints_dists_rel,
-            }
-            ''' Relative positions and distances normalization, strategy 3 '''
-        
-        if self.denoising_stra == "motion_to_rep": # motion_to_rep #
-            pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
-        
-        
-        ''' Relative positions and distances normalization, strategy 4 '''
-        # rel_base_pts_to_rhand_joints = rel_base_pts_to_rhand_joints / (self.maxx_rel - self.minn_rel).unsqueeze(0).unsqueeze(0).unsqueeze(0)
-        # dist_base_pts_to_rhand_joints = dist_base_pts_to_rhand_joints / (self.maxx_dists - self.minn_dists).unsqueeze(0).unsqueeze(0).unsqueeze(0).squeeze(-1)
-        ''' Relative positions and distances normalization, strategy 4 '''
-        
-        # 
-        # rt_pert_rhand_verts =  pert_rhand_verts
-        # rt_rhand_verts = rhand_verts
-        # rt_pert_rhand_joints = pert_rhand_joints
-        
-        # rt_rhand_joints = rhand_joints ## rhand_joints ##
-        # # rt_rhand_joints = pert_rhand_joints
-        
-        
-        # # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1s
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-        
-        ''' Obj data '''
-        obj_verts, obj_normals, obj_faces = self.get_idx_to_mesh_data(object_id)
-        obj_verts = torch.from_numpy(obj_verts).float() # nn_verts x 3 #
-        obj_normals = torch.from_numpy(obj_normals).float() # 
-        obj_faces = torch.from_numpy(obj_faces).long() # nn_faces x 3 ## -> triangels indexes ##
-        ''' Obj data '''
-        
-        # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-            
-            
-        
-        ## rhand_joints ##
-        # motion = rt_rhand_joints
-        # m_length = self.window_size
-        # caption = "a person sits down and shakes an object in his right hand."
-        # tokens = "a/DET person/NOUN sit/VERB down/ADP and/CCONJ shake/VERB an/DET object/NOUN in/ADP his/DET right/ADJ hand/NOUN"
-        
-        # object_name; caption, and tokens #
-        caption = f"{object_name}"
-        tokens = f"{object_name}/NOUN" ## tokens 
-        
-        tokens = tokens.split(" ")
-        max_text_len = 20
-        if len(tokens) < max_text_len:
-            # pad with "unk"
-            tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
-            sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (max_text_len + 2 - sent_len)
-        else:
-            # crop
-            tokens = tokens[:max_text_len]
-            tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
-            sent_len = len(tokens)
-        pos_one_hots = [] ## pose one hots ##
-        word_embeddings = []
-        for token in tokens:
-            word_emb, pos_oh = self.w_vectorizer[token]
-            pos_one_hots.append(pos_oh[None, :])
-            word_embeddings.append(word_emb[None, :])
-        pos_one_hots = np.concatenate(pos_one_hots, axis=0)
-        word_embeddings = np.concatenate(word_embeddings, axis=0)
-        # pose_one_hots, word_embeddings #
-        
-        # object_global_orient_th, object_transl_th #
-        object_global_orient_th = torch.from_numpy(object_global_orient).float()
-        object_transl_th = torch.from_numpy(object_transl).float()
-        
-        ''' Construct data for returning '''
-        rt_dict = {
-            'base_pts': base_pts, # th
-            'base_normals': base_normals, # th
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints, # th, ws x nnj x nnb x 3 
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints, # th, ws x nnj x nnb
-            # 'rhand_joints': rhand_joints,
-            'gt_rhand_joints': rhand_joints,
-            'rhand_joints': pert_rhand_joints,
-            'rhand_verts': rhand_verts,
-            # 'word_embeddings': word_embeddings,
-            # 'pos_one_hots': pos_one_hots,
-            'caption': caption,
-            # 'sent_len': sent_len,
-            # 'm_length': m_length,
-            # 'text': '_'.join(tokens),
-            'object_id': object_id, # int value
-            'lengths': rel_base_pts_to_rhand_joints.size(0),
-            'object_global_orient': object_global_orient_th,
-            'object_transl': object_transl_th,
-            'st_idx': st_idx,
-            'ed_idx': ed_idx,
-            'pert_verts': pert_rhand_verts,
-            'verts': rhand_verts,
-            'obj_verts': obj_verts,
-            'obj_normals': obj_normals,
-            'obj_faces': obj_faces, # nnfaces x 3 #
-        }
-        try:
-            # rt_dict['per_frame_avg_joints_rel'] = 
-            rt_dict.update(stats_dict)
-        except:
-            pass
-        ''' Construct data for returning '''
-        
-        # ## avg_joints : 1 x 3, std_joints: 1 ## 
-        # rt_dict = {
-        #   'word_embeddings': word_embeddings,
-        #   'pos_one_hots': pos_one_hots,
-        #   'caption': caption,
-        #   'sent_len': sent_len,
-        #   'motion': motion,
-        #   'm_length': m_length,
-        #   'tokens': '_'.join(tokens),
-        #   'st_idx': st_idx, 
-        #   'ed_idx': ed_idx,
-        #   'pert_verts': pert_rhand_verts, 
-        #   'verts': rhand_verts,
-        #   'avg_joints': avg_joints,
-        #   'std_joints': std_joints,
-        #   'object_id': object_id, # int value
-        #   'object_global_orient': object_global_orient_th,
-        #   'object_transl': object_transl_th,
-        # }
-        
-        return rt_dict
-
-
-        
-        rt_dict = {
-            ## TODO: should use object rotations to canonicalize those value as well ##
-            ## # trans_canon_pert_rhand_joints, trans_canon_rhand_joints # ##
-            ## trans canon pert rhand joints ##
-            ## trans canon pert rhand joints ##
-            'canon_pert_rhand_joints': canon_pert_rhand_joints,
-            'canon_rhand_joints': canon_rhand_joints,
-            ### trans_canon_pert_rhand_joints, trans_canon_rhand_joints ###
-            'trans_canon_pert_rhand_joints': trans_canon_pert_rhand_joints.numpy(),
-            'trans_canon_rhand_joints': trans_canon_rhand_joints.numpy(),
-            # 'canon_pert_rhand_joints': canon_pert_rhand_joints,
-            # 'canon_rhand_joints': canon_rhand_joints,
-            'pert_rhand_joints': rt_pert_rhand_joints.numpy(),
-            'rhand_joints': rt_rhand_joints.numpy(),
-            # 'rhand_global_orient': rhand_global_orient_var, # ws x 3
-            # 'pert_rhand_global_orient': pert_rhand_global_orient_var, # ws x 3
-            # 'tips_feats': tips_feats,
-            # 'pert_tips_feats': pert_tips_feats,
-            # # reverse_trans_pert_rhand_verts_th, reverse_trans_rhand_verts_th #
-            'pert_rhand_verts': rt_pert_rhand_verts,
-            'rhand_verts': rt_rhand_verts,
-            
-            # pert_rhand_betas_var, rhand_beta_var
-            'pert_rhand_betas_var': pert_rhand_betas_var.numpy(),
-            'rhand_beta_var': rhand_beta_var.numpy(),
-            
-            # pert_rhand_pose_var, rhand_pose_var
-            'pert_rhand_theta': pert_rhand_pose_var.numpy(),
-            'rhand_theta': rhand_pose_var.numpy(),
-            
-            ### ws x 3; ws x psoe_dim; ws x 3 ##3
-            ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-            ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-            'pert_rhand_rot': pert_rhand_global_orient_var.numpy(), # ws x 3 #
-            'rhand_rot': rhand_global_orient_var.numpy(),
-            
-            'pert_rhand_transl': pert_rhand_transl_var.numpy(),
-            'rhand_transl': rhand_transl_var.numpy(),
-            
-            
-            ### dist_base_pts_to_pert_rhand_joints, selected_base_to_pert_joints_dist ###
-            ### dist_base_pts_to_rhand_joints, selected_base_to_joints_dist ### ##
-            'dist_base_pts_to_pert_rhand_joints': dist_base_pts_to_pert_rhand_joints.numpy(),
-            'selected_base_to_pert_joints_dist': selected_base_to_pert_joints_dist.numpy(),
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints.numpy(),
-            'selected_base_to_joints_dist': selected_base_to_joints_dist.numpy(),
-            'rel_base_pts_to_pert_rhand_joints': rel_base_pts_to_pert_rhand_joints.numpy(),
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints.numpy(),
-            
-            # 'canon_tips_feats': canon_tips_feats,
-            # 'canon_pert_tips_feats': canon_pert_tips_feats,
-            # 'canon_joints': canon_joints,
-            
-            ### 100 verts, normals and pts, relative distances to joints ###
-            'base_pts': base_pts.numpy(), # base_sampling x 3
-            'base_normals': base_normals.numpy(), # base_sampling x 3 for the normals #
-            ### dir and distances ###
-            # 't': torch.tensor([float(cur_t) / float(self.num_sche_steps) * 0.02], dtype=torch.float32),
-            't': torch.tensor([float(cur_t) / float(self.num_sche_steps) * np.pi], dtype=torch.float32),
-            ## current timestamp ##
-            'int_t': torch.tensor([cur_t], dtype=torch.long),
-            # aug_trans, aug_rot, aug_pose #
-            'aug_trans': torch.tensor([aug_trans], dtype=torch.float32),
-            'aug_rot': torch.tensor([aug_rot], dtype=torch.float32),
-            'aug_pose': torch.tensor([aug_pose], dtype=torch.float32),
-            
-            'affinity_base_pts_to_rhand_joints': affinity_base_pts_to_rhand_joints.numpy(),
-            'obj_verts': obj_verts,
-            'obj_normals': obj_normals,
-            'obj_faces': obj_faces, # nnfaces x 3 #
-            # 'dir_base_pts_to_rhand_joints': dir_base_pts_to_rhand_joints.numpy(),
-            # 'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints.numpy(),
-            # 'dir_base_pts_to_pert_rhand_joints': dir_base_pts_to_pert_rhand_joints.numpy(),
-            # 'dist_base_pts_to_pert_rhand_joints': dist_base_pts_to_pert_rhand_joints.numpy(),
-            
-            # 'rel_base_pts_to_pert_rhand_joints': rel_base_pts_to_pert_rhand_joints.numpy(),
-            # 'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints.numpy(), 
-            # # affinity_base_pts_to_pert_rhand_joints, affinity_base_pts_to_rhand_joints 
-            # 'affinity_base_pts_to_pert_rhand_joints': affinity_base_pts_to_pert_rhand_joints.numpy(),
-            # 'affinity_base_pts_to_rhand_joints': affinity_base_pts_to_rhand_joints.numpy(),
-        }
-        
-        
-        if self.dir_stra == 'rot_angles':
-            # tangent_orient_vec # nn_base_pts x 3 #
-            rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
-        
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
-
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
-
-    def __len__(self):
-        cur_len = self.len // self.step_size
-        if cur_len * self.step_size < self.len:
-          cur_len += 1
-        return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
-
-
-
-class GRAB_Dataset_V18(torch.utils.data.Dataset):
-    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
-        #### GRAB dataset #### ## GRAB dataset
-        self.clips = []
-        self.len = 0
-        self.window_size = window_size
-        self.step_size = step_size
-        self.num_points = num_points
-        self.split = split
-        
-        split = args.single_seq_path.split("/")[-2].split("_")[0]
-        self.split = split
-        print(f"split: {self.split}")
-        
-        self.model_type = 'v1_wsubj_wjointsv25'
-        self.debug = False
-        # self.use_ambient_base_pts = args.use_ambient_base_pts
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        self.num_sche_steps = 100
-        self.w_vectorizer = w_vectorizer
-        self.use_pert = True
-        self.use_rnd_aug_hand = True
-        
-        self.args = args
-        
-        self.denoising_stra = args.denoising_stra ## denoising_stra!
-        
-        self.seq_path = args.single_seq_path ## single seq path ##
-        
-        self.inst_normalization = args.inst_normalization
-        
-        
-        # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
-        
-        
-        
-        self.aug_trans_T = 0.05
-        self.aug_rot_T = 0.3
-        self.aug_pose_T = 0.5
-        self.aug_zero = 1e-4 if self.model_type not in ['v1_wsubj_wjointsv24', 'v1_wsubj_wjointsv25'] else 0.01
-        
-        self.sigmas_trans = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_trans_T), self.num_sche_steps
-        ))
-        self.sigmas_rot = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_rot_T), self.num_sche_steps
-        ))
-        self.sigmas_pose = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_pose_T), self.num_sche_steps
-        ))
-        
-        
-        self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
-        # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
-        self.aug = True
-        self.use_anchors = False
-        # self.args = args
-        
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmesh = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        for i, fn in enumerate(obj_meshes):
-            id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        self.id2objmesh = id2objmesh
-        self.id2meshdata = {}
-        
-        ## obj root folder; ##
-        ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
-        
-        ''' Load avg, std statistics '''
-        # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
-        rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
-        rel_dists_stats = np.load(rel_dists_stats_fn, allow_pickle=True).item()
-        maxx_rel = rel_dists_stats['maxx_rel']
-        minn_rel = rel_dists_stats['minn_rel']
-        maxx_dists = rel_dists_stats['maxx_dists']
-        minn_dists = rel_dists_stats['minn_dists']
-        self.maxx_rel = torch.from_numpy(maxx_rel).float()
-        self.minn_rel = torch.from_numpy(minn_rel).float()
-        self.maxx_dists = torch.from_numpy(maxx_dists).float()
-        self.minn_dists = torch.from_numpy(minn_dists).float()
-        ''' Load avg, std statistics '''
-        
-        ''' Load avg-jts, std-jts '''
-        avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
-        std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
-        avg_jts = np.load(avg_jts_fn, allow_pickle=True)
-        std_jts = np.load(std_jts_fn, allow_pickle=True)
-        # self.avg_jts, self.std_jts #
-        self.avg_jts = torch.from_numpy(avg_jts).float()
-        self.std_jts = torch.from_numpy(std_jts).float()
-        ''' Load avg-jts, std-jts '''
-        
-        
-        # self.dist_stra = args.dist_stra
-        
-        self.load_meta = True
-        
-        self.dist_threshold = 0.005
-        self.nn_base_pts = 700
-        
-        mano_pkl_path = os.path.join(self.mano_path, 'MANO_RIGHT.pkl')
-        with open(mano_pkl_path, 'rb') as f:
-            mano_model = pickle.load(f, encoding='latin1')
-        self.template_verts = np.array(mano_model['v_template'])
-        self.template_faces = np.array(mano_model['f'])
-        self.template_joints = np.array(mano_model['J'])
-        #### finger tips; ####
-        self.template_tips = self.template_verts[[745, 317, 444, 556, 673]]
-        self.template_joints = np.concatenate([self.template_joints, self.template_tips], axis=0)
-        #### template verts ####
-        self.template_verts = self.template_verts * 0.001
-        #### template joints ####
-        self.template_joints = self.template_joints * 0.001 # nn_joints x 3 #
-        # condition on template joints for current joints #
-        
-        # self.template_joints = self.template_verts[self.hand_palm_vertex_mask]
-        
-        self.fingers_stats = [
-            [16, 15, 14, 13, 0],
-            [17, 3, 2, 1, 0],
-            [18, 6, 5, 4, 0],
-            [19, 12, 11, 10, 0],
-            [20, 9, 8, 7, 0]
-        ]
-        # 5 x 5 states, the first dimension is the finger index
-        self.fingers_stats = np.array(self.fingers_stats, dtype=np.int32)
-        self.canon_obj = True
-        
-        self.dir_stra = "vecs" # "rot_angles", "vecs"
-        # self.dir_stra = "rot_angles"
-        
-        
-        self.mano_layer = ManoLayer(
-            flat_hand_mean=True,
-            side='right',
-            mano_root=self.mano_path, # mano_root #
-            ncomps=24,
-            use_pca=True,
-            root_rot_mode='axisang',
-            joint_rot_mode='axisang'
-        )
-        
-        ## actions taken 
-        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
-        # os.makedirs(self.clip_sv_folder, exist_ok=True)
-
-        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
-        # #### filter files_clean here ####
-        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
-        
-        files_clean = [self.seq_path]
-        
-        if self.load_meta:
-          
-            for i_f, f in enumerate(files_clean): ### train, val, test clip, clip_len ###
-            # for 
-                # if split != 'train' and split != 'val' and i_f >= 100:
-                #     break
-                # if split == 'train':
-                    # print(f"loading {i_f} / {len(files_clean)}")
-                print(f"loading {i_f} / {len(files_clean)}")
-                base_nm_f = os.path.basename(f)
-                base_name_f = base_nm_f.split(".")[0]
-                cur_clip_meta_data_sv_fn = f"{base_name_f}_meta_data.npy"
-                cur_clip_meta_data_sv_fn = os.path.join(data_folder, split, cur_clip_meta_data_sv_fn)
-                cur_clip_meta_data = np.load(cur_clip_meta_data_sv_fn, allow_pickle=True).item()
-                cur_clip_len = cur_clip_meta_data['clip_len']
-                # clip_len = (cur_clip_len - window_size) // step_size + 1
-                # clip_len = cur_clip_len
-                
-                self.clips.append(self.load_clip_data(i_f, f=f)) ## add current clip ##
-                # self.clips.append((self.len, self.len+clip_len,  f
-                #     ))
-                clip_len = self.clips[i_f][3][3].shape[0]
-                self.len += clip_len # len clip len
-                self.len = 81
-                
-        else:
-            for i_f, f in enumerate(files_clean):
-                if split == 'train':
-                    print(f"loading {i_f} / {len(files_clean)}")
-                if split != 'train' and i_f >= 100:
-                    break
-                if args is not None and args.debug and i_f >= 10:
-                    break
-                clip_clean = np.load(f)
-                pert_folder_nm = split + '_pert'
-                if args is not None and not args.use_pert:
-                    pert_folder_nm = split
-                clip_pert = np.load(os.path.join(data_folder, pert_folder_nm, os.path.basename(f)))
-                clip_len = (len(clip_clean) - window_size) // step_size + 1
-                sv_clip_pert = {}
-                for i_idx in range(6):
-                    sv_clip_pert[f'f{i_idx + 1}'] = clip_pert[f'f{i_idx + 1}']
-                
-                ### sv clip pert, 
-                ##### load subj params #####
-                pure_file_name = f.split("/")[-1].split(".")[0]
-                pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                        
-                subj_params_fn = os.path.join(self.subj_data_folder, split, pure_subj_params_fn)
-                subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-                rhand_transl = subj_params["rhand_transl"]
-                rhand_betas = subj_params["rhand_betas"]
-                rhand_pose = clip_clean['f2'] ## rhand pose ##
-                
-                pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-                pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-                ##### load subj params #####
-                
-                # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-                # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-                ### pert and clean pair for encoding and decoding ###
-                self.clips.append((self.len, self.len+clip_len, clip_pert,
-                    [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                    # subj_corr_data, pert_subj_corr_data
-                    ))
-                # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
-                #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                #     # subj_corr_data, pert_subj_corr_data
-                #     ))
-                self.len += clip_len # len clip len
-        self.clips.sort(key=lambda x: x[0])
-    
-    def uinform_sample_t(self):
-        t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
-        return t
-    
-    def load_clip_data(self, clip_idx, f=None):
-        if f is None:
-          cur_clip = self.clips[clip_idx]
-          if len(cur_clip) > 3:
-              return cur_clip
-          f = cur_clip[2]
-        clip_clean = np.load(f)
-        # pert_folder_nm = self.split + '_pert'
-        pert_folder_nm = self.split
-        # if not self.use_pert:
-        #     pert_folder_nm = self.split
-        # clip_pert = np.load(os.path.join(self.data_folder, pert_folder_nm, os.path.basename(f)))
-        
-        
-        ##### load subj params #####
-        pure_file_name = f.split("/")[-1].split(".")[0]
-        pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                
-        subj_params_fn = os.path.join(self.subj_data_folder, self.split, pure_subj_params_fn)
-        subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-        rhand_transl = subj_params["rhand_transl"]
-        rhand_betas = subj_params["rhand_betas"]
-        rhand_pose = clip_clean['f2'] ## rhand pose ##
-        
-        object_global_orient = clip_clean['f5'] ## clip_len x 3 --> orientation 
-        object_trcansl = clip_clean['f6'] ## cliplen x 3 --> translation
-        
-        object_idx = clip_clean['f7'][0].item()
-        
-        pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-        pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        ##### load subj params #####
-        
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
-        # maxx_clip_len = 
-        loaded_clip = (
-            0, rhand_transl.shape[0], clip_clean,
-            [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
-        )
-        # self.clips[clip_idx] = loaded_clip
-        
-        return loaded_clip
-        
-        # self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #     # subj_corr_data, pert_subj_corr_data
-        #     ))
-        
-    def get_idx_to_mesh_data(self, obj_id):
-        if obj_id not in self.id2meshdata:
-            obj_nm = self.id2objmesh[obj_id]
-            obj_mesh = trimesh.load(obj_nm, process=False)
-            obj_verts = np.array(obj_mesh.vertices)
-            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-            obj_faces = np.array(obj_mesh.faces)
-            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
-        return self.id2meshdata[obj_id]
-
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
-    def __getitem__(self, index):
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        i_c = 0
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
-
-        object_id = c[3][-1]
-        object_name = self.id2objmeshname[object_id]
-        
-        start_idx = index * self.step_size
-        if start_idx + self.window_size > self.len:
-            start_idx = self.len - self.window_size
-            
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        
-        data = c[2][start_idx:start_idx+self.window_size]
-        # # object_global_orient = self.data[index]['f5']
-        # # object_transl = self.data[index]['f6'] #
-        # object_global_orient = data['f5'] ### get object global orientations ###
-        # object_trcansl = data['f6']
-        # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        object_global_orient = c[3][-3] # num_frames x 3 
-        object_transl = c[3][-2] # num_frames x 3
-        
-        
-        # object_global_orient, object_transl #
-        object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        object_transl = object_transl[start_idx: start_idx + self.window_size]
-        object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        object_trcansl_th = torch.from_numpy(object_transl).float()
-        
-        # pert_subj_params = c[4]
-        
-        st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx
-        
-        ### pts gt ###
-        ## rhnad pose, rhand pose gt ##
-        ## glboal orientation and hand pose #
-        rhand_global_orient_gt, rhand_pose_gt = c[3][3], c[3][4]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-        rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-        rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-        
-        rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-        rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-        
-        rhand_transl, rhand_betas = c[3][5], c[3][6]
-        rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas
-        
-        # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-        rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-        rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
-        
-        # # orientation rotation matrix #
-        # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
-        # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
-        # # orientation rotation matrix #
-        
-        rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
-        rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
-        rhand_beta_var = torch.from_numpy(rhand_betas).float()
-        rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
-        # R.from_rotvec(obj_rot).as_matrix()
-        
-        ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
-        #### ==== get random augmented pose, rot, transl ==== ####
-        # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
-        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # ### === get and save noise vectors === ###
-        # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
-        aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
-        aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
-        aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
-        # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
-        # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
-        # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
-        # ### creat augmneted orientations, pose, and transl ###
-        rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
-        rnd_aug_pose_var = rhand_pose_var + aug_pose_var
-        rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
-        
-        
-        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_betas_var, rhand_beta_var
-        rhand_verts, rhand_joints = self.mano_layer(
-            torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
-        )
-        ### rhand_joints: for joints ###
-        rhand_verts = rhand_verts * 0.001
-        rhand_joints = rhand_joints * 0.001
-         
-        # self.anchor_face_vertex_index = fvi
-        #     self.anchor_weight = aw
-        
-        ### Get palm verts ###
-        # palm_verts = rhand_verts[:, self.hand_palm_vertex_mask, :]
-
-        # rhand_joints_gt = rhand_joints.numpy() # num_frams x 21 x 3 #
-        # rhand_verts_gt = rhand_verts.numpy()
-        
-        # ### Get cannonical rhandjoints ###
-        # canon_rhand_verts, canon_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(rhand_global_orient_var), rhand_pose_var], dim=-1), 
-        #     rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(rhand_transl_var)
-        # )
-        # canon_rhand_joints = canon_rhand_joints * 0.001
-        # canon_rhand_verts = canon_rhand_verts * 0.001
-        # ### Get cannonical rhandjoints ###
-        
-        
-        # ### Get cannonical rhandjoints ###
-        # trans_canon_rhand_verts, trans_canon_rhand_joints = self.mano_layer(
-        #     torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1), 
-        #     rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(rhand_transl_var)
-        # )
-        # trans_canon_rhand_joints = trans_canon_rhand_joints * 0.001
-        # trans_canon_rhand_verts = trans_canon_rhand_verts * 0.001
-        ### Get cannonical rhandjoints ###
-        ### Canonical finger stats ###
-        # finger_stats = self.fingers_stats
-        # canon_tips = canon_rhand_joints.numpy()[:, finger_stats[:, 0]] # num_frams x 5 x 3
-        # canon_other_joint = canon_rhand_joints.numpy()[:, finger_stats[:, 1:]] # num_frams x 5 x 4 x 3
-        # canon_tips_to_other_joints = canon_other_joint - np.reshape(canon_tips, (canon_tips.shape[0], canon_tips.shape[1], 1, 3)) # num_frams x 5 x 4 x 3
-        # # tips_feats: nf x 5 x (3 + 4 * 3) = nf x 5 x 15 #
-        # canon_tips_feats = np.concatenate(
-        #     [canon_tips, canon_tips_to_other_joints.reshape(canon_tips.shape[0], canon_tips.shape[1], -1)], axis=-1
-        # ) ### 
-        ### Canonical finger stats ###
-        
-        # ### Get pert rhand pose, orientation, betas, transl, joints and verts ###
-        # pert_rhand_global_orient = data['f1'].reshape(self.window_size, 3).astype(np.float32)
-        # pert_rhand_pose = data['f2'].reshape(self.window_size, -1).astype(np.float32)
-        # pert_rhand_betas = pert_subj_params['rhand_betas'].reshape(-1).astype(np.float32)
-        # pert_rhand_transl = pert_subj_params['rhand_transl'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # ##### Get pert rhand vertices and joints #####
-        # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient)
-        # pert_rhand_global_orient_mtx_var = torch.from_numpy(pert_rhand_global_orient_mtx).float()
-        
-        # pert_rhand_global_orient_var = torch.from_numpy(pert_rhand_global_orient).float()
-        # pert_rhand_pose_var = torch.from_numpy(pert_rhand_pose).float()
-        # pert_rhand_betas_var = torch.from_numpy(pert_rhand_betas).float()
-        # pert_rhand_transl_var = torch.from_numpy(pert_rhand_transl).float()
-        
-        
-        # ### ws x 3; ws x psoe_dim; ws x 3 ##3
-        # ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        # ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-        if self.use_rnd_aug_hand: ## rnd aug pose var, transl var #
-            # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-            pert_rhand_global_orient_var = rnd_aug_global_orient_var.clone()
-            pert_rhand_pose_var = rnd_aug_pose_var.clone()
-            pert_rhand_transl_var = rnd_aug_transl_var.clone()
-            # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient_var.numpy())
-        
-        # # pert_rhand_betas_var
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_joints --> for rhand joints in the camera frmae ###
-        pert_rhand_verts, pert_rhand_joints = self.mano_layer(
-            torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), pert_rhand_transl_var
-        )
-        pert_rhand_verts = pert_rhand_verts * 0.001 # verts 
-        pert_rhand_joints = pert_rhand_joints * 0.001 # joints
-        
-        
-        
-        # canon_pert_rhand_verts, canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
-        # canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
-        
-        # ### trans_canon_pert_rhand_joints, trans_canon_rhand_joints ###
-        # trans_canon_pert_rhand_verts, trans_canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # trans_canon_pert_rhand_verts = trans_canon_pert_rhand_verts * 0.001 # verts 
-        # trans_canon_pert_rhand_joints = trans_canon_pert_rhand_joints * 0.001 # joints
-        
-        
-        
-        
-        # ### Relative positions from base points to rhand joints ###
-        object_pc = data['f3'].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_normal = data['f4'].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
-        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
-        
-        
-        # base_pts_feats_sv_dict = {}
-        #### distance between rhand joints and obj pcs ####
-        # pert_rhand_joints_th = pert_rhand_joints
-        # ws x nnjoints x nnobjpts #
-        dist_rhand_joints_to_obj_pc = torch.sum(
-            (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        )
-        # dist_pert_rhand_joints_obj_pc = torch.sum(
-        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        # )
-        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
-        
-        object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
-        # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-        dist_object_pc_nearest_pcs = torch.sum(
-            (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1
-        )
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
-        # # dist_threshold = 0.01
-        dist_threshold = self.dist_threshold
-        # # dist_threshold for pc_nearest_pcs #
-        dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-        
-        # # base_pts_mask: nn_obj_pcs #
-        base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
-        # # nn_base_pts x 3 -> torch tensor #
-        base_pts = object_pc_th[0][base_pts_mask]
-        # # base_pts_bf_sampling = base_pts.clone()
-        base_normals = object_normal_th[0][base_pts_mask]
-        
-        nn_base_pts = self.nn_base_pts
-        base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
-        base_pts_idxes = base_pts_idxes[:nn_base_pts]
-        # if self.debug:
-        #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # ### get base points ### # base_pts and base_normals #
-        base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
-        base_normals = base_normals[base_pts_idxes]
-        
-        
-        # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        base_pts_transl = object_trcansl_th[0] # 3
-        
-        # if self.dir_stra == "rot_angles": ## rot angles ##
-        #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # if self.canon_obj:
-            ## reverse transform base points ###
-            ## canonicalize base points and base normals ###
-        base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-            ) # .transpose(0, 1)
-        base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-            ) # .transpose(0, 1)
-        
-        
-        rhand_joints = torch.matmul(
-            rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        pert_rhand_joints = torch.matmul(
-            pert_rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        ''' normalization strategy xxx --- data scaling '''
-        # base_pts = base_pts * 5.
-        # rhand_joints = rhand_joints * 5.
-        ''' Normlization stratey xxx --- data scaling '''
-        
-        
-        
-        ''' GET ambinet space base pts '''
-        # normalized #
-        # rhand_joints: nf x nnj x 3
-        # base_pts: nnb x 3 ## --> (nf x nnj + nnb) x 3 #
-        tot_pts = torch.cat(
-            [rhand_joints.view(rhand_joints.size(0) * rhand_joints.size(1), 3), base_pts], dim=0
-        )
-        maxx_tot_pts, _ = torch.max(tot_pts, dim=0) ## 3
-        minn_tot_pts, _ = torch.min(tot_pts, dim=0) ## 3
-        # uniformly sample rand
-        # rand(0, 1)? # 0 and 1 
-        xyz_coords_coeffs = torch.rand((nn_base_pts, 3)) ## nn_base_pts x 3 #
-        # nn_base_pts x 3 #
-        sampled_base_pts = minn_tot_pts.unsqueeze(0) + xyz_coords_coeffs * (maxx_tot_pts - minn_tot_pts).unsqueeze(0)
-        # to object_pc
-        # nn_base_pts x nn_obj_pc # ---> nf x nnb x nn_obj
-        dist_sampled_base_pts_to_obj_pc = torch.sum(
-            (sampled_base_pts.unsqueeze(0).unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        )
-        # nf x nnb; nf x nnb #
-        minn_dist_sampled_base_to_obj, minn_dist_idxes = torch.min(
-            dist_sampled_base_pts_to_obj_pc, dim=-1
-        )
-        
-        ## sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns ##
-        ## sampled_base_pts, sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns #
-        # TODO: should compare between raw pts and raltive positions to nearest obj pts #
-        # sampled_base...: nf x nnb x 3 #
-        sampled_base_pts_nearest_obj_pc = utils.batched_index_select_ours(
-            values=object_pc_th, indices=minn_dist_idxes, dim=1
-        )
-        # sampled...: nf x nnb x 3 #
-        sampled_base_pts_nearest_obj_vns = utils.batched_index_select_ours(
-            values=object_normal_th, indices=minn_dist_idxes, dim=1
-        )
-        
-        # base pts single values, nearest object pc and nearest object normal #
-        ''' GET ambinet space base pts '''
-        
-        
-        base_pts = sampled_base_pts
-        
-        ''' Relative positions and distances normalization, strategy 1 '''
-        # rhand_joints = rhand_joints * 5.
-        # base_pts = base_pts * 5.
-        ''' Relative positions and distances normalization, strategy 1 '''
-        # sampled_base_pts: nn_base_pts x 3 #
-        # nf x nnj x nnb x 3 #
-        # nf x nnj x nnb x 3 #
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - sampled_base_pts.unsqueeze(0).unsqueeze(0)
-        # # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        # dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        
-        
-        
-         
-        # base_pts_mean = base_pts.mean(dim=0, keepdim=True)
-        # base_pts = base_pts - base_pts_mean
-        # base_pts_maxx, _ = torch.max(base_pts, dim=0)
-        # base_pts_minn, _ = torch.min(base_pts, dim=0)
-        # scale = torch.sqrt(((base_pts_maxx - base_pts_minn) ** 2).sum(dim=-1, keepdim=True)) # 1 x 1
-        
-        # rhand_joints = (rhand_joints - )
-        
-
-        # nf x nnj x nnb x 3 # 
-        rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        if self.denoising_stra == "rep":
-            ''' Relative positions and distances normalization, strategy 3 '''
-            # # for each point normalize joints over all frames #
-            # # rel_base_pts_to_rhand_joints: nf x nnj x nnb x 3 #
-            # per_frame_avg_joints_rel = torch.mean(
-            #     rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            # )
-            # per_frame_std_joints_rel = torch.std(
-            #     rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            # )
-            # per_frame_avg_joints_dists_rel = torch.mean(
-            #     dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            # )
-            # per_frame_std_joints_dists_rel = torch.std(
-            #     dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            # )
-            # max xyz vlaues for the relative positions, maximum, minimum distances for them #
-            
-            
-            ''' Stra 2 -> per frame with joints '''
-            # nf x nnj x nnb x 3 #
-            ws, nnf , nnb = rel_base_pts_to_rhand_joints.shape[:3]
-            per_frame_avg_joints_rel = torch.mean(
-                rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True # for each point #
-            ).unsqueeze(0)
-            per_frame_std_joints_rel = torch.std(
-                rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True
-            ).unsqueeze(0)
-            per_frame_avg_joints_dists_rel = torch.mean(
-                dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            ).unsqueeze(0)
-            per_frame_std_joints_dists_rel = torch.std(
-                dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            ).unsqueeze(0)
-            
-            
-            # # nf x nnj x nnb x 3 # 
-            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-            # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-            dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-            
-            rel_base_pts_to_rhand_joints = (rel_base_pts_to_rhand_joints - per_frame_avg_joints_rel) / per_frame_std_joints_rel
-            dist_base_pts_to_rhand_joints = (dist_base_pts_to_rhand_joints - per_frame_avg_joints_dists_rel) / per_frame_std_joints_dists_rel
-            stats_dict = {
-                'per_frame_avg_joints_rel': per_frame_avg_joints_rel,
-                'per_frame_std_joints_rel': per_frame_std_joints_rel,
-                'per_frame_avg_joints_dists_rel': per_frame_avg_joints_dists_rel,
-                'per_frame_std_joints_dists_rel': per_frame_std_joints_dists_rel,
-            }
-            ''' Relative positions and distances normalization, strategy 3 '''
-        
-        if self.denoising_stra == "motion_to_rep": # motion_to_rep #
-            pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
-        
-        
-        ''' Relative positions and distances normalization, strategy 4 '''
-        # rel_base_pts_to_rhand_joints = rel_base_pts_to_rhand_joints / (self.maxx_rel - self.minn_rel).unsqueeze(0).unsqueeze(0).unsqueeze(0)
-        # dist_base_pts_to_rhand_joints = dist_base_pts_to_rhand_joints / (self.maxx_dists - self.minn_dists).unsqueeze(0).unsqueeze(0).unsqueeze(0).squeeze(-1)
-        ''' Relative positions and distances normalization, strategy 4 '''
-        
-        # 
-        # rt_pert_rhand_verts =  pert_rhand_verts
-        # rt_rhand_verts = rhand_verts
-        # rt_pert_rhand_joints = pert_rhand_joints
-        
-        # rt_rhand_joints = rhand_joints ## rhand_joints ##
-        # # rt_rhand_joints = pert_rhand_joints
-        
-        
-        # # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1s
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-        
-        ''' Obj data '''
-        obj_verts, obj_normals, obj_faces = self.get_idx_to_mesh_data(object_id)
-        obj_verts = torch.from_numpy(obj_verts).float() # nn_verts x 3 #
-        obj_normals = torch.from_numpy(obj_normals).float() # 
-        obj_faces = torch.from_numpy(obj_faces).long() # nn_faces x 3 ## -> triangels indexes ##
-        ''' Obj data '''
-        
-        # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-            
-            
-        
-        ## rhand_joints ##
-        # motion = rt_rhand_joints
-        # m_length = self.window_size
-        # caption = "a person sits down and shakes an object in his right hand."
-        # tokens = "a/DET person/NOUN sit/VERB down/ADP and/CCONJ shake/VERB an/DET object/NOUN in/ADP his/DET right/ADJ hand/NOUN"
-        
-        # object_name; caption, and tokens #
-        caption = f"{object_name}"
-        tokens = f"{object_name}/NOUN" ## tokens 
-        
-        tokens = tokens.split(" ")
-        max_text_len = 20
-        if len(tokens) < max_text_len:
-            # pad with "unk"
-            tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
-            sent_len = len(tokens)
-            tokens = tokens + ['unk/OTHER'] * (max_text_len + 2 - sent_len)
-        else:
-            # crop
-            tokens = tokens[:max_text_len]
-            tokens = ['sos/OTHER'] + tokens + ['eos/OTHER']
-            sent_len = len(tokens)
-        pos_one_hots = [] ## pose one hots ##
-        word_embeddings = []
-        for token in tokens:
-            word_emb, pos_oh = self.w_vectorizer[token]
-            pos_one_hots.append(pos_oh[None, :])
-            word_embeddings.append(word_emb[None, :])
-        pos_one_hots = np.concatenate(pos_one_hots, axis=0)
-        word_embeddings = np.concatenate(word_embeddings, axis=0)
-        # pose_one_hots, word_embeddings #
-        
-        # object_global_orient_th, object_transl_th #
-        object_global_orient_th = torch.from_numpy(object_global_orient).float()
-        object_transl_th = torch.from_numpy(object_transl).float()
-        
-        ''' Construct data for returning '''
-        rt_dict = {
-            'base_pts': base_pts, # th
-            'base_normals': base_normals, # th
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints, # th, ws x nnj x nnb x 3 
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints, # th, ws x nnj x nnb
-            # 'rhand_joints': rhand_joints,
-            'rhand_joints': pert_rhand_joints,
-            'rhand_verts': rhand_verts,
-            # 'word_embeddings': word_embeddings,
-            # 'pos_one_hots': pos_one_hots,
-            'caption': caption,
-            # 'sent_len': sent_len,
-            # 'm_length': m_length,
-            # 'text': '_'.join(tokens),
-            'object_id': object_id, # int value
-            'lengths': rel_base_pts_to_rhand_joints.size(0),
-            'object_global_orient': object_global_orient_th,
-            'object_transl': object_transl_th,
-            'st_idx': st_idx,
-            'ed_idx': ed_idx,
-            'pert_verts': pert_rhand_verts,
-            'verts': rhand_verts,
-            'obj_verts': obj_verts,
-            'obj_normals': obj_normals,
-            'obj_faces': obj_faces, # nnfaces x 3 #
-            ## sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns ##
-            'sampled_base_pts_nearest_obj_pc': sampled_base_pts_nearest_obj_pc, 
-            'sampled_base_pts_nearest_obj_vns': sampled_base_pts_nearest_obj_vns,
-        }
-        try:
-            # rt_dict['per_frame_avg_joints_rel'] = 
-            rt_dict.update(stats_dict)
-        except:
-            pass
-        ''' Construct data for returning '''
-        
-        # ## avg_joints : 1 x 3, std_joints: 1 ## 
-        # rt_dict = {
-        #   'word_embeddings': word_embeddings,
-        #   'pos_one_hots': pos_one_hots,
-        #   'caption': caption,
-        #   'sent_len': sent_len,
-        #   'motion': motion,
-        #   'm_length': m_length,
-        #   'tokens': '_'.join(tokens),
-        #   'st_idx': st_idx, 
-        #   'ed_idx': ed_idx,
-        #   'pert_verts': pert_rhand_verts, 
-        #   'verts': rhand_verts,
-        #   'avg_joints': avg_joints,
-        #   'std_joints': std_joints,
-        #   'object_id': object_id, # int value
-        #   'object_global_orient': object_global_orient_th,
-        #   'object_transl': object_transl_th,
-        # }
-        
-        return rt_dict
-
-
-        
-        rt_dict = {
-            ## TODO: should use object rotations to canonicalize those value as well ##
-            ## # trans_canon_pert_rhand_joints, trans_canon_rhand_joints # ##
-            ## trans canon pert rhand joints ##
-            ## trans canon pert rhand joints ##
-            'canon_pert_rhand_joints': canon_pert_rhand_joints,
-            'canon_rhand_joints': canon_rhand_joints,
-            ### trans_canon_pert_rhand_joints, trans_canon_rhand_joints ###
-            'trans_canon_pert_rhand_joints': trans_canon_pert_rhand_joints.numpy(),
-            'trans_canon_rhand_joints': trans_canon_rhand_joints.numpy(),
-            # 'canon_pert_rhand_joints': canon_pert_rhand_joints,
-            # 'canon_rhand_joints': canon_rhand_joints,
-            'pert_rhand_joints': rt_pert_rhand_joints.numpy(),
-            'rhand_joints': rt_rhand_joints.numpy(),
-            # 'rhand_global_orient': rhand_global_orient_var, # ws x 3
-            # 'pert_rhand_global_orient': pert_rhand_global_orient_var, # ws x 3
-            # 'tips_feats': tips_feats,
-            # 'pert_tips_feats': pert_tips_feats,
-            # # reverse_trans_pert_rhand_verts_th, reverse_trans_rhand_verts_th #
-            'pert_rhand_verts': rt_pert_rhand_verts,
-            'rhand_verts': rt_rhand_verts,
-            
-            # pert_rhand_betas_var, rhand_beta_var
-            'pert_rhand_betas_var': pert_rhand_betas_var.numpy(),
-            'rhand_beta_var': rhand_beta_var.numpy(),
-            
-            # pert_rhand_pose_var, rhand_pose_var
-            'pert_rhand_theta': pert_rhand_pose_var.numpy(),
-            'rhand_theta': rhand_pose_var.numpy(),
-            
-            ### ws x 3; ws x psoe_dim; ws x 3 ##3
-            ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-            ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-            'pert_rhand_rot': pert_rhand_global_orient_var.numpy(), # ws x 3 #
-            'rhand_rot': rhand_global_orient_var.numpy(),
-            
-            'pert_rhand_transl': pert_rhand_transl_var.numpy(),
-            'rhand_transl': rhand_transl_var.numpy(),
-            
-            
-            ### dist_base_pts_to_pert_rhand_joints, selected_base_to_pert_joints_dist ###
-            ### dist_base_pts_to_rhand_joints, selected_base_to_joints_dist ### ##
-            'dist_base_pts_to_pert_rhand_joints': dist_base_pts_to_pert_rhand_joints.numpy(),
-            'selected_base_to_pert_joints_dist': selected_base_to_pert_joints_dist.numpy(),
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints.numpy(),
-            'selected_base_to_joints_dist': selected_base_to_joints_dist.numpy(),
-            'rel_base_pts_to_pert_rhand_joints': rel_base_pts_to_pert_rhand_joints.numpy(),
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints.numpy(),
-            
-            # 'canon_tips_feats': canon_tips_feats,
-            # 'canon_pert_tips_feats': canon_pert_tips_feats,
-            # 'canon_joints': canon_joints,
-            
-            ### 100 verts, normals and pts, relative distances to joints ###
-            'base_pts': base_pts.numpy(), # base_sampling x 3
-            'base_normals': base_normals.numpy(), # base_sampling x 3 for the normals #
-            ### dir and distances ###
-            # 't': torch.tensor([float(cur_t) / float(self.num_sche_steps) * 0.02], dtype=torch.float32),
-            't': torch.tensor([float(cur_t) / float(self.num_sche_steps) * np.pi], dtype=torch.float32),
-            ## current timestamp ##
-            'int_t': torch.tensor([cur_t], dtype=torch.long),
-            # aug_trans, aug_rot, aug_pose #
-            'aug_trans': torch.tensor([aug_trans], dtype=torch.float32),
-            'aug_rot': torch.tensor([aug_rot], dtype=torch.float32),
-            'aug_pose': torch.tensor([aug_pose], dtype=torch.float32),
-            
-            'affinity_base_pts_to_rhand_joints': affinity_base_pts_to_rhand_joints.numpy(),
-            'obj_verts': obj_verts,
-            'obj_normals': obj_normals,
-            'obj_faces': obj_faces, # nnfaces x 3 #
-            # 'dir_base_pts_to_rhand_joints': dir_base_pts_to_rhand_joints.numpy(),
-            # 'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints.numpy(),
-            # 'dir_base_pts_to_pert_rhand_joints': dir_base_pts_to_pert_rhand_joints.numpy(),
-            # 'dist_base_pts_to_pert_rhand_joints': dist_base_pts_to_pert_rhand_joints.numpy(),
-            
-            # 'rel_base_pts_to_pert_rhand_joints': rel_base_pts_to_pert_rhand_joints.numpy(),
-            # 'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints.numpy(), 
-            # # affinity_base_pts_to_pert_rhand_joints, affinity_base_pts_to_rhand_joints 
-            # 'affinity_base_pts_to_pert_rhand_joints': affinity_base_pts_to_pert_rhand_joints.numpy(),
-            # 'affinity_base_pts_to_rhand_joints': affinity_base_pts_to_rhand_joints.numpy(),
-        }
-        
-        
-        if self.dir_stra == 'rot_angles':
-            # tangent_orient_vec # nn_base_pts x 3 #
-            rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
-        
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
-
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
-
-    def __len__(self):
-        cur_len = self.len // self.step_size
-        if cur_len * self.step_size < self.len:
-          cur_len += 1
-        return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
-
-
-# GRAB
-class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and 
+# GRAB #
+class GRAB_Dataset_V19(torch.utils.data.Dataset):
     def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None): # 
-        #### GRAB dataset #### ## GRAB dataset # 
         self.clips = []
         self.len = 0
         self.window_size = window_size
@@ -2872,20 +52,28 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         self.inst_normalization = args.inst_normalization
         
         
-        ### for starting idxes ###
+        
         # self.start_idx = args.start_idx # clip starting idxes #
         self.start_idx = 0
         
         # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
+        # grab_path =  "/data1/xueyi/GRAB_extracted"
+        # ## grab contactmesh ## id2objmeshname
+        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        # id2objmeshname = []
+        # obj_meshes = sorted(os.listdir(obj_mesh_path))
+        # # objectmesh name #
+        # id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
+        # self.id2objmeshname = id2objmeshname
         
+        # obj_mesh_path = "data/grab/object_meshes"
+        obj_mesh_path = "data/grab/object_meshes"
+        id2objmesh = []
+        obj_meshes = sorted(os.listdir(obj_mesh_path))
+        for i, fn in enumerate(obj_meshes):
+            id2objmesh.append(os.path.join(obj_mesh_path, fn))
+        self.id2objmesh = id2objmesh
+        self.id2meshdata = {}
         
         
         self.aug_trans_T = 0.05
@@ -2906,9 +94,11 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         
         ## predicted infos fn ##
         self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
+        # self.subj_data_folder = data_folder
+        self.subj_data_folder = data_folder
         # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        # manopth/mano/models
+        self.mano_path = "manopth/mano/models" ### mano_path
         ## mano paths ##
         self.aug = True
         self.use_anchors = False
@@ -2916,19 +106,19 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         
         self.use_anchors = args.use_anchors
         
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmesh = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        for i, fn in enumerate(obj_meshes):
-            id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        self.id2objmesh = id2objmesh
-        self.id2meshdata = {}
+        # self.grab_path = "/data1/xueyi/GRAB_extracted"
+        # obj_mesh_path = "data/grab/object_meshes"
+        # id2objmesh = []
+        # obj_meshes = sorted(os.listdir(obj_mesh_path))
+        # for i, fn in enumerate(obj_meshes):
+        #     id2objmesh.append(os.path.join(obj_mesh_path, fn))
+        # self.id2objmesh = id2objmesh
+        # self.id2meshdata = {}
         
         ## obj root folder; ##
         ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
+        # self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
+        # self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
         
         ''' Load avg, std statistics '''
         # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
@@ -3009,24 +199,24 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         
         
         ### Load field data from root folders ### ## obj root folder ##
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
+        # self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
+        # self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
         
         
-        # anchor_load_driver, masking_load_driver #
-        # use_anchors, self.hand_palm_vertex_mask #
-        if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-            # anchor_load_driver, masking_load_driver #
-            inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-            fvi, aw, _, _ = anchor_load_driver(inpath)
-            self.face_vertex_index = torch.from_numpy(fvi).long()
-            self.anchor_weight = torch.from_numpy(aw).float()
+        # # anchor_load_driver, masking_load_driver #
+        # # use_anchors, self.hand_palm_vertex_mask #
+        # if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
+        #     # anchor_load_driver, masking_load_driver #
+        #     inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
+        #     fvi, aw, _, _ = anchor_load_driver(inpath)
+        #     self.face_vertex_index = torch.from_numpy(fvi).long()
+        #     self.anchor_weight = torch.from_numpy(aw).float()
             
-            anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-            palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-            hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-            # self.hand_palm_vertex_mask for hand palm mask #
-            self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
+        #     anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
+        #     palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
+        #     hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
+        #     # self.hand_palm_vertex_mask for hand palm mask #
+        #     self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
         
         
         ## actions taken 
@@ -3104,10 +294,6 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
                     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
                     # subj_corr_data, pert_subj_corr_data
                     ))
-                # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
-                #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                #     # subj_corr_data, pert_subj_corr_data
-                #     ))
                 self.len += clip_len # len clip len
         self.clips.sort(key=lambda x: x[0])
     
@@ -3161,10 +347,6 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         
         return loaded_clip
         
-        # self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #     # subj_corr_data, pert_subj_corr_data
-        #     ))
         
     def get_idx_to_mesh_data(self, obj_id):
         if obj_id not in self.id2meshdata:
@@ -3177,30 +359,18 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         return self.id2meshdata[obj_id]
 
     #### enforce correct contacts #### ### the sequence in the clip is what we want here #
-    def __getitem__(self, index): # get item; articulated objects? #
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        i_c = 0
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
+    def __getitem__(self, index):
 
+        i_c = 0
+        c = self.clips[i_c]
+        
         object_id = c[3][-1]
-        object_name = self.id2objmeshname[object_id]
+        # object_name = self.id2objmeshname[object_id]
         
         #  self.start_idx = args.start_idx
         # start_idx = 0  # 
         start_idx = self.start_idx
-        # start_idx = index * self.step_size
-        # if start_idx + self.window_size > self.len:
-        #     start_idx = self.len - self.window_size
-        
-        # and crop data sequences here ### 
-        # TODO: add random noise settings for noisy input #
-        
+
         # start_idx = (index - c[0]) * self.step_size
         print(f"start_idx: {start_idx}, window_size: {self.window_size}")
         data = c[2][start_idx:start_idx+self.window_size]
@@ -3272,11 +442,11 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
         #### ==== get random augmented pose, rot, transl ==== ####
         # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
-        # noise scale #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3 # scale 1 for the standard scale
+        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
+        # aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
+        # aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
+        # # noise scale #
+        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3 # scale 1 for the standard scale
         aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.4 ### scale 3 for the standard scale ###
         # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.5
         # cur_t = self.uinform_sample_t()
@@ -3466,27 +636,6 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
             )
             
             
-            
-            
-            
-        # # if self.debug:
-        # #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        # base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        # base_pts_transl = object_trcansl_th[0] # 3
-        
-        # # if self.dir_stra == "rot_angles": ## rot angles ##
-        # #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # # if self.canon_obj:
-        #     ## reverse transform base points ###
-        #     ## canonicalize base points and base normals ###
-        # base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-        #     ) # .transpose(0, 1)
-        # base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-        #     ) # .transpose(0, 1)
-        
         
         rhand_joints = torch.matmul(
             rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
@@ -3647,23 +796,7 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
                 dist_base_pts_to_rhand_joints, dim=0, keepdim=True
             )
             # max xyz vlaues for the relative positions, maximum, minimum distances for them #
-            
-            
-            # ''' Stra 2 -> per frame with joints '''
-            # # nf x nnj x nnb x 3 #
-            # ws, nnf , nnb = rel_base_pts_to_rhand_joints.shape[:3]
-            # per_frame_avg_joints_rel = torch.mean(
-            #     rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True # for each point #
-            # ).unsqueeze(0)
-            # per_frame_std_joints_rel = torch.std(
-            #     rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            # per_frame_avg_joints_dists_rel = torch.mean(
-            #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            # per_frame_std_joints_dists_rel = torch.std(
-            #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            # ).unsqueeze(0)
+
             
             if not self.args.use_arti_obj:
                 # # nf x nnj x nnb x 3 # 
@@ -3691,49 +824,15 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
             pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
         
         
-        ''' Relative positions and distances normalization, strategy 4 '''
-        # rel_base_pts_to_rhand_joints = rel_base_pts_to_rhand_joints / (self.maxx_rel - self.minn_rel).unsqueeze(0).unsqueeze(0).unsqueeze(0)
-        # dist_base_pts_to_rhand_joints = dist_base_pts_to_rhand_joints / (self.maxx_dists - self.minn_dists).unsqueeze(0).unsqueeze(0).unsqueeze(0).squeeze(-1)
-        ''' Relative positions and distances normalization, strategy 4 '''
-        
-        # 
-        # rt_pert_rhand_verts =  pert_rhand_verts
-        # rt_rhand_verts = rhand_verts
-        # rt_pert_rhand_joints = pert_rhand_joints
-        
-        # rt_rhand_joints = rhand_joints ## rhand_joints ##
-        # # rt_rhand_joints = pert_rhand_joints
-        
-        
-        # # rt_rhand_joints: nf x nnjts x 3 # ### pertrhandjoints
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1s
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-        
+
         ''' Obj data '''
         obj_verts, obj_normals, obj_faces = self.get_idx_to_mesh_data(object_id) # obj_verts, normals #
         obj_verts = torch.from_numpy(obj_verts).float() # nn_verts x 3 #
         obj_normals = torch.from_numpy(obj_normals).float() # 
         obj_faces = torch.from_numpy(obj_faces).long() # nn_faces x 3 ## -> triangels indexes ##
         ''' Obj data '''
-        
-        # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-            
-            
-        
+
+
         caption = "apple"
         # pose_one_hots, word_embeddings #
         
@@ -3800,18 +899,856 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
         
         return rt_dict
 
+    def __len__(self):
+        cur_len = self.len // self.step_size
+        if cur_len * self.step_size < self.len:
+          cur_len += 1
+        cur_len = 1
+        return cur_len
 
-        if self.dir_stra == 'rot_angles':
-            # tangent_orient_vec # nn_base_pts x 3 #
-            rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
+
+# GRAB # 
+class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
+    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
+        #### GRAB dataset #### ## GRAB dataset
+        self.clips = []
+        self.len = 0
+        self.window_size = window_size
+        self.step_size = step_size
+        self.num_points = num_points
+        self.split = split
         
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
+        
+        
+        split = args.single_seq_path.split("/")[-2].split("_")[0]
+        self.split = split
+        print(f"split: {self.split}")
+        
+        self.model_type = 'v1_wsubj_wjointsv25'
+        self.debug = False
+        # self.use_ambient_base_pts = args.use_ambient_base_pts
+        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
+        self.num_sche_steps = 100
+        self.w_vectorizer = w_vectorizer
+        self.use_pert = True
+        self.use_rnd_aug_hand = True
+        
+        self.args = args
+        
+        self.denoising_stra = args.denoising_stra ## denoising_stra!
+        
+        self.seq_path = args.single_seq_path ## single seq path ##
+        
+        self.inst_normalization = args.inst_normalization
+        
+        
+        # # load datas # grab path; grab sequences #
+        # grab_path =  "/data1/xueyi/GRAB_extracted"
+        # ## grab contactmesh ## id2objmeshname
+        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        # id2objmeshname = []
+        # obj_meshes = sorted(os.listdir(obj_mesh_path))
+        # # objectmesh name #
+        # id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
+        # self.id2objmeshname = id2objmeshname
+        
+        
+        ## the predicted_info_fn
+        predicted_info_fn = args.predicted_info_fn
+        # load data from predicted information #
+        data = np.load(predicted_info_fn, allow_pickle=True).item()
+        self.wpredverts = False
+        if 'optimized_out_hand_joints_ne' in data: ### joints_ne for joints ##
+            print("Loading from optimized_out_hand_joints_ne!!!")
+            outputs = data['optimized_out_hand_joints_ne'] # outputs of the o
+            self.wpredverts = False
+        elif 'hand_joints' in data:
+            print(f"Loading from hand_joints!!!!")
+            outputs = data['hand_joints'] # ws x nn_joints x 3 #
+            predicted_hand_verts = data['hand_verts'] 
+            # 
+            self.wpredverts = True
+            if len(args.predicted_info_fn_jts_only) > 0:
+                print(f"Loading from predicted_info_fn_jts_only!!!!!")
+                cur_predicted_info_fn_jts_only = np.load(args.predicted_info_fn_jts_only, allow_pickle=True).item()
+                tot_obj_rot = cur_predicted_info_fn_jts_only['tot_obj_rot'][0] # ws x 3 x 3 #
+                tot_obj_transl = cur_predicted_info_fn_jts_only['tot_obj_transl'][0] # ws x 3 #
+                ws = tot_obj_transl.shape[0]
+                outputs = np.matmul( # the outputs: ws x nn_joints x 3 #
+                    outputs - tot_obj_transl.reshape(ws, 1, 3), np.transpose(tot_obj_rot, (0, 2, 1)) #  
+                )
+                predicted_hand_verts = np.matmul( # the outputs: ws x nn_joints x 3 #
+                    predicted_hand_verts - tot_obj_transl.reshape(ws, 1, 3), np.transpose(tot_obj_rot, (0, 2, 1)) #  
+                )
+            self.predicted_hand_verts = predicted_hand_verts
+            self.predicted_hand_verts = torch.from_numpy(self.predicted_hand_verts).float()
+        else:
+            outputs = data['outputs']
+        self.predicted_hand_joints = outputs # nf x nnjoints x 3 #
+        self.predicted_hand_joints = torch.from_numpy(self.predicted_hand_joints).float()
+        # obj_verts = data['obj_verts']
+        # obj_faces = data['obj_faces']
+        # tot_base_pts = data["tot_base_pts"][0]
+        # single_obj_normals = data['single_obj_normals']
+        # self.obj_ver
+        
+        print(f"predicted_hand_joints: {self.predicted_hand_joints.shape}")
+        
+        self.start_idx = args.start_idx
+        
+        
+        self.aug_trans_T = 0.05
+        self.aug_rot_T = 0.3
+        self.aug_pose_T = 0.5
+        self.aug_zero = 1e-4 if self.model_type not in ['v1_wsubj_wjointsv24', 'v1_wsubj_wjointsv25'] else 0.01
+        
+        self.sigmas_trans = np.exp(np.linspace(
+            np.log(self.aug_zero), np.log(self.aug_trans_T), self.num_sche_steps
+        ))
+        self.sigmas_rot = np.exp(np.linspace(
+            np.log(self.aug_zero), np.log(self.aug_rot_T), self.num_sche_steps
+        ))
+        self.sigmas_pose = np.exp(np.linspace(
+            np.log(self.aug_zero), np.log(self.aug_pose_T), self.num_sche_steps
+        ))
+        
+        
+        self.data_folder = data_folder
+        self.subj_data_folder = data_folder # subj_data_folder
+        # self.subj_corr_data_folder = args.subj_corr_data_folder
+        self.mano_path = "manopth/mano/models" ### mano_path
+        self.aug = True
+        self.use_anchors = False
 
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
+        
+        # self.grab_path = "/data1/xueyi/GRAB_extracted"
+        
+        # obj_mesh_path = "data/grab/object_meshes"
+        obj_mesh_path = "data/grab/object_meshes"
+        id2objmesh = []
+        obj_meshes = sorted(os.listdir(obj_mesh_path))
+        for i, fn in enumerate(obj_meshes):
+            id2objmesh.append(os.path.join(obj_mesh_path, fn))
+        self.id2objmesh = id2objmesh
+        self.id2meshdata = {}
+        
+        # ## obj root folder; ##
+        # ### Load field data from root folders ###
+        # self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
+        # self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
+        
+        ''' Load avg, std statistics '''
+        # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
+        # rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
+        # rel_dists_stats = np.load(rel_dists_stats_fn, allow_pickle=True).item()
+        # maxx_rel = rel_dists_stats['maxx_rel']
+        # minn_rel = rel_dists_stats['minn_rel']
+        # maxx_dists = rel_dists_stats['maxx_dists']
+        # minn_dists = rel_dists_stats['minn_dists']
+        # self.maxx_rel = torch.from_numpy(maxx_rel).float()
+        # self.minn_rel = torch.from_numpy(minn_rel).float()
+        # self.maxx_dists = torch.from_numpy(maxx_dists).float()
+        # self.minn_dists = torch.from_numpy(minn_dists).float()
+        ''' Load avg, std statistics '''
+        
+        ''' Load avg-jts, std-jts '''
+        # avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
+        # std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
+        # avg_jts = np.load(avg_jts_fn, allow_pickle=True)
+        # std_jts = np.load(std_jts_fn, allow_pickle=True)
+        # # self.avg_jts, self.std_jts #
+        # self.avg_jts = torch.from_numpy(avg_jts).float()
+        # self.std_jts = torch.from_numpy(std_jts).float()
+        ''' Load avg-jts, std-jts '''
+        
+        
+        # self.dist_stra = args.dist_stra
+        
+        self.load_meta = True
+        
+        self.dist_threshold = 0.005
+        # self.nn_base_pts = 700
+        self.nn_base_pts = args.nn_base_pts
+        print(f"nn_base_pts: {self.nn_base_pts}")
+        
+        mano_pkl_path = os.path.join(self.mano_path, 'MANO_RIGHT.pkl')
+        with open(mano_pkl_path, 'rb') as f:
+            mano_model = pickle.load(f, encoding='latin1')
+        self.template_verts = np.array(mano_model['v_template'])
+        self.template_faces = np.array(mano_model['f'])
+        self.template_joints = np.array(mano_model['J'])
+        #### finger tips; ####
+        self.template_tips = self.template_verts[[745, 317, 444, 556, 673]]
+        self.template_joints = np.concatenate([self.template_joints, self.template_tips], axis=0)
+        #### template verts ####
+        self.template_verts = self.template_verts * 0.001
+        #### template joints ####
+        self.template_joints = self.template_joints * 0.001 # nn_joints x 3 #
+        # condition on template joints for current joints #
+        
+        # self.template_joints = self.template_verts[self.hand_palm_vertex_mask]
+        
+        self.fingers_stats = [
+            [16, 15, 14, 13, 0],
+            [17, 3, 2, 1, 0],
+            [18, 6, 5, 4, 0],
+            [19, 12, 11, 10, 0],
+            [20, 9, 8, 7, 0]
+        ]
+        # 5 x 5 states, the first dimension is the finger index
+        self.fingers_stats = np.array(self.fingers_stats, dtype=np.int32)
+        self.canon_obj = True
+        
+        self.dir_stra = "vecs" # "rot_angles", "vecs"
+        # self.dir_stra = "rot_angles"
+        
+        
+        self.mano_layer = ManoLayer(
+            flat_hand_mean=True,
+            side='right',
+            mano_root=self.mano_path, # mano_root #
+            ncomps=24,
+            use_pca=True,
+            root_rot_mode='axisang',
+            joint_rot_mode='axisang'
+        )
+        
+        ## actions taken 
+        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
+        # os.makedirs(self.clip_sv_folder, exist_ok=True)
+
+        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
+        # #### filter files_clean here ####
+        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
+        
+        files_clean = [self.seq_path]
+        
+        if self.load_meta:
+          
+            for i_f, f in enumerate(files_clean): ### train, val, test clip, clip_len ###
+            # for 
+                # if split != 'train' and split != 'val' and i_f >= 100:
+                #     break
+                # if split == 'train':
+                    # print(f"loading {i_f} / {len(files_clean)}")
+                print(f"loading {i_f} / {len(files_clean)}")
+                base_nm_f = os.path.basename(f)
+                base_name_f = base_nm_f.split(".")[0]
+                cur_clip_meta_data_sv_fn = f"{base_name_f}_meta_data.npy"
+                cur_clip_meta_data_sv_fn = os.path.join(data_folder, split, cur_clip_meta_data_sv_fn)
+                cur_clip_meta_data = np.load(cur_clip_meta_data_sv_fn, allow_pickle=True).item()
+                cur_clip_len = cur_clip_meta_data['clip_len']
+                # clip_len = (cur_clip_len - window_size) // step_size + 1
+                # clip_len = cur_clip_len
+                
+                self.clips.append(self.load_clip_data(i_f, f=f)) ## add current clip ##
+                # self.clips.append((self.len, self.len+clip_len,  f
+                #     ))
+                clip_len = self.clips[i_f][3][3].shape[0]
+                self.len += clip_len # len clip len
+                self.len = 81
+                
+        else:
+            for i_f, f in enumerate(files_clean):
+                if split == 'train':
+                    print(f"loading {i_f} / {len(files_clean)}")
+                if split != 'train' and i_f >= 100:
+                    break
+                if args is not None and args.debug and i_f >= 10:
+                    break
+                clip_clean = np.load(f)
+                pert_folder_nm = split + '_pert'
+                if args is not None and not args.use_pert:
+                    pert_folder_nm = split
+                clip_pert = np.load(os.path.join(data_folder, pert_folder_nm, os.path.basename(f)))
+                clip_len = (len(clip_clean) - window_size) // step_size + 1
+                sv_clip_pert = {}
+                for i_idx in range(6):
+                    sv_clip_pert[f'f{i_idx + 1}'] = clip_pert[f'f{i_idx + 1}']
+                
+                ### sv clip pert, 
+                ##### load subj params #####
+                pure_file_name = f.split("/")[-1].split(".")[0]
+                pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
+                        
+                subj_params_fn = os.path.join(self.subj_data_folder, split, pure_subj_params_fn)
+                subj_params = np.load(subj_params_fn, allow_pickle=True).item()
+                rhand_transl = subj_params["rhand_transl"]
+                rhand_betas = subj_params["rhand_betas"]
+                rhand_pose = clip_clean['f2'] ## rhand pose ##
+                
+                pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
+                pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
+                ##### load subj params #####
+                
+                # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
+                # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
+                ### pert and clean pair for encoding and decoding ###
+                self.clips.append((self.len, self.len+clip_len, clip_pert,
+                    [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
+                    # subj_corr_data, pert_subj_corr_data
+                    ))
+                # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
+                #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
+                #     # subj_corr_data, pert_subj_corr_data
+                #     ))
+                self.len += clip_len # len clip len
+        self.clips.sort(key=lambda x: x[0])
+    
+    def uinform_sample_t(self):
+        t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
+        return t
+    
+    def load_clip_data(self, clip_idx, f=None):
+        if f is None:
+          cur_clip = self.clips[clip_idx]
+          if len(cur_clip) > 3:
+              return cur_clip
+          f = cur_clip[2]
+        clip_clean = np.load(f)
+        # pert_folder_nm = self.split + '_pert'
+        pert_folder_nm = self.split
+        # if not self.use_pert:
+        #     pert_folder_nm = self.split
+        # clip_pert = np.load(os.path.join(self.data_folder, pert_folder_nm, os.path.basename(f)))
+        
+        
+        ##### load subj params #####
+        pure_file_name = f.split("/")[-1].split(".")[0]
+        pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
+                
+        subj_params_fn = os.path.join(self.subj_data_folder, self.split, pure_subj_params_fn)
+        subj_params = np.load(subj_params_fn, allow_pickle=True).item()
+        rhand_transl = subj_params["rhand_transl"]
+        rhand_betas = subj_params["rhand_betas"]
+        rhand_pose = clip_clean['f2'] ## rhand pose ##
+        
+        object_global_orient = clip_clean['f5'] ## clip_len x 3 --> orientation 
+        object_trcansl = clip_clean['f6'] ## cliplen x 3 --> translation
+        
+        object_idx = clip_clean['f7'][0].item()
+        
+        pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
+        pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
+        ##### load subj params #####
+        
+        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
+        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
+        ### pert and clean pair for encoding and decoding ###
+        
+        # maxx_clip_len = 
+        loaded_clip = (
+            0, rhand_transl.shape[0], clip_clean,
+            [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
+        )
+        # self.clips[clip_idx] = loaded_clip
+        
+        return loaded_clip
+        
+        # self.clips.append((self.len, self.len+clip_len, clip_pert,
+        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
+        #     # subj_corr_data, pert_subj_corr_data
+        #     ))
+        
+    def get_idx_to_mesh_data(self, obj_id):
+        if obj_id not in self.id2meshdata:
+            obj_nm = self.id2objmesh[obj_id]
+            obj_mesh = trimesh.load(obj_nm, process=False)
+            obj_verts = np.array(obj_mesh.vertices)
+            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
+            obj_faces = np.array(obj_mesh.faces)
+            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
+        return self.id2meshdata[obj_id]
+
+    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
+    def __getitem__(self, index):
+        ## GRAB single frame ##
+        # for i_c, c in enumerate(self.clips):
+        #     if index < c[1]:
+        #         break
+        i_c = 0
+        # if self.load_meta:
+        #     # self.load_clip_data(i_c)
+        c = self.clips[i_c]
+        # c = self.load_clip_data(i_c)
+
+        object_id = c[3][-1]
+        # object_name = self.id2objmeshname[object_id]
+        
+        # start_idx = index * self.step_size
+        # if start_idx + self.window_size > self.len:
+        #     start_idx = self.len - self.window_size
+        
+        start_idx = self.start_idx
+            
+        # TODO: add random noise settings for noisy input #
+        
+        # start_idx = (index - c[0]) * self.step_size
+        
+        data = c[2][start_idx:start_idx+self.window_size]
+        # # object_global_orient = self.data[index]['f5']
+        # # object_transl = self.data[index]['f6'] #
+        # object_global_orient = data['f5'] ### get object global orientations ###
+        # object_trcansl = data['f6']
+        # # object_id = data['f7'][0].item() ### data_f7 item ###
+        # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
+        
+        object_global_orient = c[3][-3] # num_frames x 3 
+        object_transl = c[3][-2] # num_frames x 3
+        
+        
+        # object_global_orient, object_transl #
+        object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
+        object_transl = object_transl[start_idx: start_idx + self.window_size]
+        object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
+        object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
+        
+        
+        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
+        # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
+        
+        
+        object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
+        object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
+        object_trcansl_th = torch.from_numpy(object_transl).float()
+        
+        # pert_subj_params = c[4]
+        
+        st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx
+        
+        ### pts gt ###
+        ## rhnad pose, rhand pose gt ##
+        ## glboal orientation and hand pose #
+        rhand_global_orient_gt, rhand_pose_gt = c[3][3], c[3][4]
+        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
+        rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
+        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
+        rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
+        
+        rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
+        rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
+        
+        rhand_transl, rhand_betas = c[3][5], c[3][6]
+        rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas
+        
+        # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
+        rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
+        rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
+        
+        # # orientation rotation matrix #
+        # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
+        # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
+        # # orientation rotation matrix #
+        
+        rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
+        rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
+        rhand_beta_var = torch.from_numpy(rhand_betas).float()
+        rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
+        # R.from_rotvec(obj_rot).as_matrix()
+        
+        ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
+        ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
+        #### ==== get random augmented pose, rot, transl ==== ####
+        # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
+        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
+        aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
+        aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
+        # cur_t = self.uinform_sample_t()
+        # # aug_trans, aug_rot, aug_pose #
+        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
+        # ### === get and save noise vectors === ###
+        # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
+        aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
+        aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
+        aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
+        # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
+        # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
+        # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
+        # ### creat augmneted orientations, pose, and transl ###
+        rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
+        rnd_aug_pose_var = rhand_pose_var + aug_pose_var
+        rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
+        
+        
+        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
+        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
+        # pert_rhand_betas_var, rhand_beta_var
+        rhand_verts, rhand_joints = self.mano_layer(
+            torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
+            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
+        )
+        ### rhand_joints: for joints ###
+        rhand_verts = rhand_verts * 0.001
+        rhand_joints = rhand_joints * 0.001
+        
+        
+        # ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
+        if self.use_rnd_aug_hand: ## rnd aug pose var, transl var #
+            # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
+            pert_rhand_global_orient_var = rnd_aug_global_orient_var.clone()
+            pert_rhand_pose_var = rnd_aug_pose_var.clone()
+            pert_rhand_transl_var = rnd_aug_transl_var.clone()
+            # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient_var.numpy())
+        
+        # # pert_rhand_betas_var
+        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
+        # pert_rhand_joints --> for rhand joints in the camera frmae ###
+        pert_rhand_verts, pert_rhand_joints = self.mano_layer(
+            torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
+            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), pert_rhand_transl_var
+        )
+        pert_rhand_verts = pert_rhand_verts * 0.001 # verts 
+        pert_rhand_joints = pert_rhand_joints * 0.001 # joints
+
+
+        if self.wpredverts:
+            # print(f"ori_pert_rhand_verts: {pert_rhand_verts.s}")
+            pert_rhand_joints = self.predicted_hand_joints
+            rhand_joints = self.predicted_hand_joints
+
+            rhand_verts = self.predicted_hand_verts
+            pert_rhand_verts =  self.predicted_hand_verts
+            
+            pert_rhand_joints = torch.matmul(
+                pert_rhand_joints, object_global_orient_mtx_th
+            ) + object_trcansl_th.unsqueeze(1)
+
+            rhand_joints = torch.matmul(
+                rhand_joints, object_global_orient_mtx_th
+            ) + object_trcansl_th.unsqueeze(1)
+
+            rhand_verts = torch.matmul(
+                rhand_verts, object_global_orient_mtx_th
+            ) + object_trcansl_th.unsqueeze(1)
+
+            pert_rhand_verts = torch.matmul(
+                pert_rhand_verts, object_global_orient_mtx_th
+            ) + object_trcansl_th.unsqueeze(1)
+        
+        
+       
+        
+        # use_canon_joints
+        
+        canon_pert_rhand_verts, canon_pert_rhand_joints = self.mano_layer(
+            torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
+            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
+        )
+        canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
+        canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
+        
+        
+        # ### Relative positions from base points to rhand joints ###
+        object_pc = data['f3'].reshape(self.window_size, -1, 3).astype(np.float32)
+        object_normal = data['f4'].reshape(self.window_size, -1, 3).astype(np.float32)
+        object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
+        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
+        object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
+        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
+        
+        
+        # base_pts_feats_sv_dict = {}
+        #### distance between rhand joints and obj pcs ####
+        # pert_rhand_joints_th = pert_rhand_joints
+        # ws x nnjoints x nnobjpts #
+        dist_rhand_joints_to_obj_pc = torch.sum(
+            (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
+        )
+        # dist_pert_rhand_joints_obj_pc = torch.sum(
+        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
+        # )
+        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
+        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
+        
+        object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
+        nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
+        # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
+        dist_object_pc_nearest_pcs = torch.sum(
+            (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1
+        )
+        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs
+        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
+        # # dist_threshold = 0.01
+        dist_threshold = self.dist_threshold
+        # # dist_threshold for pc_nearest_pcs #
+        dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
+        
+        # # base_pts_mask: nn_obj_pcs #
+        base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
+        # # nn_base_pts x 3 -> torch tensor #
+        base_pts = object_pc_th[0][base_pts_mask]
+        # # base_pts_bf_sampling = base_pts.clone()
+        base_normals = object_normal_th[0][base_pts_mask]
+        
+        nn_base_pts = self.nn_base_pts
+        base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
+        base_pts_idxes = base_pts_idxes[:nn_base_pts]
+        # if self.debug:
+        #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
+        
+        # ### get base points ### # base_pts and base_normals #
+        base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
+        base_normals = base_normals[base_pts_idxes]
+        
+        
+        # # object_global_orient_mtx # nn_ws x 3 x 3 #
+        base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
+        base_pts_transl = object_trcansl_th[0] # 3
+        
+        # if self.dir_stra == "rot_angles": ## rot angles ##
+        #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
+        
+        # if self.canon_obj:
+            ## reverse transform base points ###
+            ## canonicalize base points and base normals ###
+        base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
+            ) # .transpose(0, 1)
+        base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
+            ) # .transpose(0, 1)
+        
+        
+        rhand_joints = torch.matmul(
+            rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
+        )
+        
+        pert_rhand_joints = torch.matmul(
+            pert_rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
+        )
+        
+        
+        if not self.wpredverts:
+            pert_rhand_joints = self.predicted_hand_joints
+        
+
+        # nf x nnj x nnb x 3 # 
+        rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
+        
+        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
+        
+        # # dist_base_pts_to...: ws x nn_joints x nn_sampling # ### dit bae tps to rhand joints ###
+        dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
+        
+        
+        # k of the # # nf x nnj x nnb # # nnj x nnb # nnb -> 
+        ## TODO: other choices of k_f? ##
+        k_f = 1.
+        # relative #
+        l2_rel_base_pts_to_rhand_joints = torch.norm(rel_base_pts_to_rhand_joints, dim=-1)
+        ### att_forces ##
+        att_forces = torch.exp(-k_f * l2_rel_base_pts_to_rhand_joints) # nf x nnj x nnb #
+        
+        att_forces = att_forces[:-1, :, :]
+        # rhand_joints: ws x nnj x 3 # -> (ws - 1) x nnj x 3 ## rhand_joints ##
+        
+        
+        rhand_joints_disp = pert_rhand_joints[1:, :, :] - pert_rhand_joints[:-1, :, :]
+        
+        # rhand_joints_disp = rhand_joints[1:, :, :] - rhand_joints[:-1, :, :]
+        # 
+        # distance -- base_normalss,; (ws - 1) x nnj x nnb x 3 -
+        signed_dist_base_pts_to_rhand_joints_along_normal = torch.sum(
+            base_normals.unsqueeze(0).unsqueeze(0) * rhand_joints_disp.unsqueeze(2), dim=-1
+        )
+        # nf x nnj x nnb x 3 --> rel_vt_normals ## nf x nnj x nnb
+        # # (ws - 1) x nnj x nnb # # (ws - 1) x nnj x 3 --> 
+        # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
+        rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals.unsqueeze(0).unsqueeze(0)
+        # nf x nnj x nnb ---> dist_vt_normals -> nf x nnj x nnb # # torch.sqrt() ##
+        dist_base_pts_to_rhand_joints_vt_normal = torch.sqrt(torch.sum(
+            rel_base_pts_to_rhand_joints_vt_normal ** 2, dim=-1
+        ))
+        
+        k_a = 1.
+        k_b = 1.
+        # k and # give me a noised sequence ... #
+        # (ws - 1) x nnj x nnb # --> (ws - 1) x nnj x nnb # nnj x nnb # 
+        # add noise -> chagne of the joints displacements 
+        # -> change of along_normalss energies and vertical to normals energies #
+        # -> change of energy taken to make the displacements #
+        # jts_to_base_pts energy in the noisy sequence #
+        # jts_to_base_pts energy in the clean sequence #
+        # vt-normal, along_normal #
+        # TODO: the normalization strategy: 1) per-instnace; 2) per-category; #3
+        # att_forces: (ws - 1) x nnj x nnb # # 
+        e_disp_rel_to_base_along_normals = k_a * att_forces * torch.abs(signed_dist_base_pts_to_rhand_joints_along_normal)
+        # (ws - 1) x nnj x nnb # -> dist vt normals #
+        e_disp_rel_to_baes_vt_normals = k_b * att_forces * dist_base_pts_to_rhand_joints_vt_normal
+        # base_pts; base_normals; 
+        
+        
+        ''' normalization sstrategy 1 ''' # 
+        # per_frame_avg_disp_along_normals, per_frame_std_disp_along_normals # 
+        # per_frame_avg_disp_vt_normals, per_frame_std_disp_vt_normals #
+        # e_disp_rel_to_base_along_normals, e_disp_rel_to_baes_vt_normals #
+        # per_frame_avg_disp_along_normalss, per_frame_std_disp_along_normalss # 
+        # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
+        disp_ws, nnj, nnb = e_disp_rel_to_base_along_normals.shape[:3]
+        # disp_ws x nnf x nnb x 3 #  -> disp_ws x nnj x nnb
+        per_frame_avg_disp_along_normals = torch.mean( # avg over all frmaes #
+            e_disp_rel_to_base_along_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True # for each point #
+        ) # .unsqueeze(0)
+        per_frame_std_disp_along_normals = torch.std( # std over all frames #
+            e_disp_rel_to_base_along_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
+        ) # .unsqueeze(0)
+        per_frame_avg_disp_vt_normals = torch.mean( # avg over all frmaes #
+            e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True # for each point #
+        ) # .unsqueeze(0)
+        per_frame_std_disp_vt_normals = torch.std( # std over all frames #
+            e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
+        ) # .unsqueeze(0)
+        # per_frame_avg_joints_dists_rel = torch.mean(
+        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
+        # ).unsqueeze(0)
+        # per_frame_std_joints_dists_rel = torch.std(
+        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
+        # ).unsqueeze(0)
+        ### normalizaed aong normals and vat normals  # ws x nnj x nnb 
+        e_disp_rel_to_base_along_normals = (e_disp_rel_to_base_along_normals - per_frame_avg_disp_along_normals) / per_frame_std_disp_along_normals
+        e_disp_rel_to_baes_vt_normals = (e_disp_rel_to_baes_vt_normals - per_frame_avg_disp_vt_normals) / per_frame_std_disp_vt_normals
+        # enrgy temrs #
+        ''' normalization sstrategy 1 ''' # 
+        
+        
+        
+        
+        
+        if self.denoising_stra == "rep":
+            ''' Relative positions and distances normalization, strategy 3 '''
+            # # for each point normalize joints over all frames #
+            # # rel_base_pts_to_rhand_joints: nf x nnj x nnb x 3 #
+            per_frame_avg_joints_rel = torch.mean(
+                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
+            )
+            per_frame_std_joints_rel = torch.std(
+                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
+            )
+            per_frame_avg_joints_dists_rel = torch.mean(
+                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
+            )
+            per_frame_std_joints_dists_rel = torch.std(
+                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
+            )
+            # max xyz vlaues for the relative positions, maximum, minimum distances for them #
+            
+            
+            # # nf x nnj x nnb x 3 # 
+            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
+            # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
+            dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
+            
+            rel_base_pts_to_rhand_joints = (rel_base_pts_to_rhand_joints - per_frame_avg_joints_rel) / per_frame_std_joints_rel
+            dist_base_pts_to_rhand_joints = (dist_base_pts_to_rhand_joints - per_frame_avg_joints_dists_rel) / per_frame_std_joints_dists_rel
+            stats_dict = {
+                'per_frame_avg_joints_rel': per_frame_avg_joints_rel,
+                'per_frame_std_joints_rel': per_frame_std_joints_rel,
+                'per_frame_avg_joints_dists_rel': per_frame_avg_joints_dists_rel,
+                'per_frame_std_joints_dists_rel': per_frame_std_joints_dists_rel,
+            }
+            ''' Relative positions and distances normalization, strategy 3 '''
+        
+        if self.denoising_stra == "motion_to_rep": # motion_to_rep #
+            pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
+        
+        
+        ''' Relative positions and distances normalization, strategy 4 '''
+        # rel_base_pts_to_rhand_joints = rel_base_pts_to_rhand_joints / (self.maxx_rel - self.minn_rel).unsqueeze(0).unsqueeze(0).unsqueeze(0)
+        # dist_base_pts_to_rhand_joints = dist_base_pts_to_rhand_joints / (self.maxx_dists - self.minn_dists).unsqueeze(0).unsqueeze(0).unsqueeze(0).squeeze(-1)
+        ''' Relative positions and distances normalization, strategy 4 '''
+        
+        # 
+        # rt_pert_rhand_verts =  pert_rhand_verts
+        # rt_rhand_verts = rhand_verts
+        # rt_pert_rhand_joints = pert_rhand_joints
+        
+        # rt_rhand_joints = rhand_joints ## rhand_joints ##
+        # # rt_rhand_joints = pert_rhand_joints
+        
+        
+        # # rt_rhand_joints: nf x nnjts x 3 # ### pertrhandjoints
+        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
+        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
+        # # avg_joints = torch.mean(avg_joints, dim=)
+        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1s
+        # if self.inst_normalization:
+        #     if self.args.debug:
+        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
+        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
+        
+        ''' Obj data '''
+        obj_verts, obj_normals, obj_faces = self.get_idx_to_mesh_data(object_id)
+        obj_verts = torch.from_numpy(obj_verts).float() # nn_verts x 3 #
+        obj_normals = torch.from_numpy(obj_normals).float() # 
+        obj_faces = torch.from_numpy(obj_faces).long() # nn_faces x 3 ## -> triangels indexes ##
+        ''' Obj data '''
+        
+        # rt_rhand_joints: nf x nnjts x 3 #
+        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
+        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
+        # # avg_joints = torch.mean(avg_joints, dim=)
+        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
+        # if self.inst_normalization:
+        #     if self.args.debug:
+        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
+        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
+            
+        # word_embeddings = np.concatenate(word_embeddings, axis=0)
+        caption = "apple"
+        # pose_one_hots, word_embeddings #
+        
+        # object_global_orient_th, object_transl_th #
+        object_global_orient_th = torch.from_numpy(object_global_orient).float()
+        object_transl_th = torch.from_numpy(object_transl).float()
+        
+        ''' Construct data for returning '''
+        rt_dict = {
+            'base_pts': base_pts, # th
+            'base_normals': base_normals, # th
+            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints, # th, ws x nnj x nnb x 3 
+            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints, # th, ws x nnj x nnb
+            # 'rhand_joints': rhand_joints,
+            'gt_rhand_joints': rhand_joints, ## rhand joints ###
+            'rhand_joints': pert_rhand_joints if not self.args.use_canon_joints else canon_pert_rhand_joints,
+            'rhand_verts': rhand_verts,
+            # 'word_embeddings': word_embeddings,
+            # 'pos_one_hots': pos_one_hots,
+            'caption': caption,
+            # 'sent_len': sent_len,
+            # 'm_length': m_length,
+            # 'text': '_'.join(tokens),
+            'object_id': object_id, # int value
+            'lengths': rel_base_pts_to_rhand_joints.size(0),
+            'object_global_orient': object_global_orient_th,
+            'object_transl': object_transl_th,
+            # 'st_idx': st_idx,
+            # 'ed_idx': ed_idx,
+            'st_idx': 0,
+            'ed_idx': 0 + self.window_size,
+            'pert_verts': pert_rhand_verts,
+            'verts': rhand_verts,
+            'obj_verts': obj_verts,
+            'obj_normals': obj_normals, # normals? 
+            'obj_faces': obj_faces, # nnfaces x 3 #
+             'obj_rot': object_global_orient_mtx_th, # ws x 3 x 3 --> 
+            'obj_transl': object_trcansl_th, # ws x 3 --> obj transl 
+            ## sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns ##
+            # 'sampled_base_pts_nearest_obj_pc': sampled_base_pts_nearest_obj_pc, 
+            # 'sampled_base_pts_nearest_obj_vns': sampled_base_pts_nearest_obj_vns,
+            'per_frame_avg_disp_along_normals': per_frame_avg_disp_along_normals,
+            'per_frame_std_disp_along_normals': per_frame_std_disp_along_normals,
+            'per_frame_avg_disp_vt_normals': per_frame_avg_disp_vt_normals,
+            'per_frame_std_disp_vt_normals': per_frame_std_disp_vt_normals,
+            'e_disp_rel_to_base_along_normals': e_disp_rel_to_base_along_normals,
+            'e_disp_rel_to_baes_vt_normals': e_disp_rel_to_baes_vt_normals, # 
+        }
+        try:
+            # rt_dict['per_frame_avg_joints_rel'] = 
+            rt_dict.update(stats_dict)
+        except:
+            pass
+        ''' Construct data for returning '''
+        
+        return rt_dict
+
 
     def __len__(self):
         cur_len = self.len // self.step_size
@@ -3819,13 +1756,11 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset): # GRAB datasset and
           cur_len += 1
         cur_len = 1
         return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
 
 
 
 
-# obj_fn, obj_rot=None, obj_trans=None #
+# Utils #
 def get_object_mesh_ours_arti(obj_fn, obj_rot, obj_trans):
     # object_id, object_rot, object_transl = d['f7'], d['f5'], d['f6']
     # is_left = d['f9']
@@ -3876,7 +1811,7 @@ def get_object_mesh_ours_arti(obj_fn, obj_rot, obj_trans):
     return object_mesh    
 
 
-# for hoi4d dataset #
+# HOI4D #
 class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
     def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
         #### GRAB dataset #### ## GRAB dataset
@@ -3884,7 +1819,7 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         self.len = 0
         
         self.single_seq_path = args.single_seq_path
-        self.data = np.load(self.single_seq_path, allow_pickle=True) # .item()
+        self.data = np.load(self.single_seq_path, allow_pickle=True)
         
         
         self.window_size = window_size
@@ -3915,9 +1850,9 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         self.denoising_stra = args.denoising_stra ## denoising_stra!
         
         # self.data_folder = data_folder
-        # self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
+        # self.subj_data_folder = data_folder
         # # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        self.mano_path = "manopth/mano/models" ### mano_path
         # self.aug = True
         # self.use_anchors = False
         # # self.args = args
@@ -3996,20 +1931,20 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
             joint_rot_mode='axisang'
         )
         
-        # anchor_load_driver, masking_load_driver #
-        # use_anchors, self.hand_palm_vertex_mask #
-        if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-            # anchor_load_driver, masking_load_driver #
-            inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-            fvi, aw, _, _ = anchor_load_driver(inpath)
-            self.face_vertex_index = torch.from_numpy(fvi).long()
-            self.anchor_weight = torch.from_numpy(aw).float()
+        # # anchor_load_driver, masking_load_driver #
+        # # use_anchors, self.hand_palm_vertex_mask #
+        # if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
+        #     # anchor_load_driver, masking_load_driver #
+        #     inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
+        #     fvi, aw, _, _ = anchor_load_driver(inpath)
+        #     self.face_vertex_index = torch.from_numpy(fvi).long()
+        #     self.anchor_weight = torch.from_numpy(aw).float()
             
-            anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-            palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-            hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-            # self.hand_palm_vertex_mask for hand palm mask #
-            self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
+        #     anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
+        #     palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
+        #     hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
+        #     # self.hand_palm_vertex_mask for hand palm mask #
+        #     self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
         
     
     def uinform_sample_t(self):
@@ -4068,13 +2003,6 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         #     ))
         
     def get_idx_to_mesh_data(self):
-        # if obj_id not in self.id2meshdata:
-        #     obj_nm = self.id2objmesh[obj_id]
-        #     obj_mesh = trimesh.load(obj_nm, process=False)
-        #     obj_verts = np.array(obj_mesh.vertices)
-        #     obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-        #     obj_faces = np.array(obj_mesh.faces)
-        #     self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
         cad_model_fn = self.cad_model_fn
         obj_mesh = trimesh.load(cad_model_fn, process=False)
         obj_verts = np.array(obj_mesh.vertices)
@@ -4123,13 +2051,7 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         for i_frame in range(i_frame_st, i_frame_ed):
             cur_obj_rot = self.raw_corr_data[i_frame]['obj_rot']
             cur_obj_trans = self.raw_corr_data[i_frame]['obj_trans']
-            # cad_model_fn = [
-            #     "/share/datasets/HOI4D_CAD_Model_for_release/articulated/Scissors/011/objs/new-1-align.obj",  # 
-            #     "/share/datasets/HOI4D_CAD_Model_for_release/articulated/Scissors/011/objs/new-0-align.obj" 
-            # ]
-            
-            # cur_arti_cat_nm = self.args.cad_model_fn.split("/")[-4]
-            # cur_arti_inst_nm = self.args.cad_model_fn.split("/")[-3]
+
             
             cur_arti_cat_nm = cat_nm
             cur_arti_inst_nm = int(series_obj_inst_idx) # ## series obj inst idxes ### 
@@ -4248,43 +2170,14 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
 
     #### enforce correct contacts #### ### the sequence in the clip is what we want here #
     def __getitem__(self, index):
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        # i_c = 0
-        
-        # start_idx = 0
+
         
         start_idx = self.start_idx
         if len(self.corr_fn) > 0:
             cur_obj_verts, cur_obj_faces, cur_obj_normals, cur_obj_glb_rot, cur_obj_glb_trans, tot_hand_beta, tot_hand_theta, tot_hand_transl, tot_hand_joints, tot_full_obj_verts, tot_full_obj_faces = self.get_ari_obj_fr_x(start_idx, start_idx + self.window_size) # nn_obj_verts x 3; nn_obj_faces x 3 #
             print(f"corr_fn: {self.corr_fn}, obj_verts: {cur_obj_verts.shape}, cur_obj_faces: {cur_obj_faces.shape}")
             
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        # c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
-
-        # object_id = c[3][-1]
-        # object_name = self.id2objmeshname[object_id]
-        
-        # start_idx = index * self.step_size
-        # if start_idx + self.window_size > self.len:
-        #     start_idx = self.len - self.window_size
-            
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        
-        # num_points = self.data['f1'].shape[0] // 3
-        # rhand_pc = self.data[index]['f0'].reshape(778, 3) # method to get such data cannot generalize well...
-        # object_pc = self.data[index]['f1'].reshape(-1, 3)
-        # object_vn = self.data[index]['f2'].reshape(-1, 3)
-        # object_corr_mask = self.data[index]['f5'].reshape(-1)
-        # object_corr_pts = self.data[index]['f7'].reshape(-1, 3)
-        # object_corr_dist = self.data[index]['f6'].reshape(-1)
-        
+ 
         
         if self.args.select_part_idx != -1:
             # tot_obj_verts_th = torch.from_numpy(cur_obj_verts).float()
@@ -4369,33 +2262,6 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         pert_rhand_joints = rhand_joints
         pert_rhand_verts = rhand_verts
         
-        
-        # data = c[2][start_idx:start_idx+self.window_size]
-        # # # object_global_orient = self.data[index]['f5']
-        # # # object_transl = self.data[index]['f6'] #
-        # # object_global_orient = data['f5'] ### get object global orientations ###
-        # # object_trcansl = data['f6']
-        # # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        # object_global_orient = c[3][-3] # num_frames x 3 
-        # object_transl = c[3][-2] # num_frames x 3
-        
-        
-        # # object_global_orient, object_transl #
-        # object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        # object_transl = object_transl[start_idx: start_idx + self.window_size]
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        # object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        # object_trcansl_th = torch.from_numpy(object_transl).float()
         
         
         if self.args.select_part_idx != -1:
@@ -5065,7 +2931,7 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         # return self.len
 
 
-# GRAB v19 arctic ###
+# ARCTIC #
 class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
     def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None): # 
         #### GRAB dataset #### GRAB dataset ##
@@ -5132,9 +2998,9 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         
         ## predicted infos fn ##
         self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
+        self.subj_data_folder = data_folder
         # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        self.mano_path = "manopth/mano/models" ### mano_path
         ## mano paths ##
         self.aug = True
         self.use_anchors = False
@@ -5143,7 +3009,7 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         self.use_anchors = args.use_anchors
         
         self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
+        obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
         for i, fn in enumerate(obj_meshes):
@@ -5994,1088 +3860,7 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
 
 
 
-# GRAB ### v19 arctic ###
-class GRAB_Dataset_V19_Arctic_from_Pred(torch.utils.data.Dataset): # GRAB datasset #
-    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None): # 
-        #### GRAB dataset #### GRAB dataset ####
-        self.clips = []
-        self.len = 0
-        self.window_size = window_size
-        self.step_size = step_size
-        self.num_points = num_points
-        self.split = split
-        
-        split = args.single_seq_path.split("/")[-2].split("_")[0]
-        self.split = split
-        print(f"split: {self.split}")
-        
-        self.model_type = 'v1_wsubj_wjointsv25'
-        self.debug = False
-        # self.use_ambient_base_pts = args.use_ambient_base_pts
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        self.num_sche_steps = 100
-        self.w_vectorizer = w_vectorizer
-        self.use_pert = True
-        self.use_rnd_aug_hand = True
-        
-        self.args = args
-        
-        self.denoising_stra = args.denoising_stra ## denoising_stra!
-        
-        self.seq_path = args.single_seq_path ## single seq path ##
-        
-        self.inst_normalization = args.inst_normalization
-        
-        
-        ### for starting idxes ###
-        # self.start_idx = args.start_idx # clip starting idxes #
-        self.start_idx = self.args.start_idx
-        
-        # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
-        
-        
-        
-        self.aug_trans_T = 0.05
-        self.aug_rot_T = 0.3
-        self.aug_pose_T = 0.5
-        self.aug_zero = 1e-4 if self.model_type not in ['v1_wsubj_wjointsv24', 'v1_wsubj_wjointsv25'] else 0.01
-        
-        self.sigmas_trans = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_trans_T), self.num_sche_steps
-        ))
-        self.sigmas_rot = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_rot_T), self.num_sche_steps
-        ))
-        self.sigmas_pose = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_pose_T), self.num_sche_steps
-        ))
-        
-        
-        ## predicted infos fn ##
-        self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
-        # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
-        ## mano paths ##
-        self.aug = True
-        self.use_anchors = False
-        # self.args = args
-        
-        self.use_anchors = args.use_anchors
-        
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmesh = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        for i, fn in enumerate(obj_meshes):
-            id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        self.id2objmesh = id2objmesh
-        self.id2meshdata = {}
-        
-        ## obj root folder; ##
-        ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
-        
-        ''' Load avg, std statistics '''
-        # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
-        # rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
-        # rel_dists_stats = np.load(rel_dists_stats_fn, allow_pickle=True).item()
-        # maxx_rel = rel_dists_stats['maxx_rel']
-        # minn_rel = rel_dists_stats['minn_rel']
-        # maxx_dists = rel_dists_stats['maxx_dists']
-        # minn_dists = rel_dists_stats['minn_dists']
-        # self.maxx_rel = torch.from_numpy(maxx_rel).float()
-        # self.minn_rel = torch.from_numpy(minn_rel).float()
-        # self.maxx_dists = torch.from_numpy(maxx_dists).float()
-        # self.minn_dists = torch.from_numpy(minn_dists).float()
-        ''' Load avg, std statistics '''
-        
-        ''' Load avg-jts, std-jts '''
-        # avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
-        # std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
-        # avg_jts = np.load(avg_jts_fn, allow_pickle=True)
-        # std_jts = np.load(std_jts_fn, allow_pickle=True)
-        # # self.avg_jts, self.std_jts #
-        # self.avg_jts = torch.from_numpy(avg_jts).float()
-        # self.std_jts = torch.from_numpy(std_jts).float()
-        ''' Load avg-jts, std-jts '''
-        
-        # single sequences #
-        if len(args.predicted_info_fn):
-            predicted_info_fn = args.predicted_info_fn
-            self.predicted_info_fn = predicted_info_fn
-            # load data from predicted information #
-            data = np.load(predicted_info_fn, allow_pickle=True).item()
-            pred_joints = data["outputs"]
-            self.predicted_joints = pred_joints
-            self.predicted_joints = torch.from_numpy(self.predicted_joints).float() ### 
-        else:
-            # self.predicted_info_fn, self.predicted_joints
-            self.predicted_info_fn = ""
-        # self.dist_stra = args.dist_stra
-        
-        self.load_meta = True
-        
-        self.dist_threshold = 0.005
-        self.dist_threshold = 0.01
-        # self.nn_base_pts = 700
-        self.nn_base_pts = args.nn_base_pts
-        print(f"nn_base_pts: {self.nn_base_pts}")
-        
-        mano_pkl_path = os.path.join(self.mano_path, 'MANO_RIGHT.pkl')
-        with open(mano_pkl_path, 'rb') as f:
-            mano_model = pickle.load(f, encoding='latin1')
-        self.template_verts = np.array(mano_model['v_template'])
-        self.template_faces = np.array(mano_model['f'])
-        self.template_joints = np.array(mano_model['J'])
-        #### finger tips; ####
-        self.template_tips = self.template_verts[[745, 317, 444, 556, 673]]
-        self.template_joints = np.concatenate([self.template_joints, self.template_tips], axis=0)
-        #### template verts ####
-        self.template_verts = self.template_verts * 0.001
-        #### template joints ####
-        self.template_joints = self.template_joints * 0.001 # nn_joints x 3 #
-        # condition on template joints for current joints #
-        
-        # self.template_joints = self.template_verts[self.hand_palm_vertex_mask]
-        
-        self.fingers_stats = [
-            [16, 15, 14, 13, 0],
-            [17, 3, 2, 1, 0],
-            [18, 6, 5, 4, 0],
-            [19, 12, 11, 10, 0],
-            [20, 9, 8, 7, 0]
-        ]
-        # 5 x 5 states, the first dimension is the finger index
-        self.fingers_stats = np.array(self.fingers_stats, dtype=np.int32)
-        self.canon_obj = True
-        
-        self.dir_stra = "vecs" # "rot_angles", "vecs"
-        # self.dir_stra = "rot_angles"
-        
-        
-        self.rgt_mano_layer = ManoLayer(
-            flat_hand_mean=False,
-            side='right',
-            mano_root=self.mano_path, # mano_root #
-            ncomps=45,
-            use_pca=False,
-            # root_rot_mode='axisang',
-            # joint_rot_mode='axisang'
-        )
-        
-        self.lft_mano_layer = ManoLayer(
-            flat_hand_mean=False,
-            side='left',
-            mano_root=self.mano_path, # mano_root #
-            ncomps=45,
-            use_pca=False,
-            # root_rot_mode='axisang',
-            # joint_rot_mode='axisang'
-        )
-        
-        
-        ### Load field data from root folders ### ## obj root folder ##
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
-        
-        
-        # anchor_load_driver, masking_load_driver #
-        # use_anchors, self.hand_palm_vertex_mask #
-        if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-            # anchor_load_driver, masking_load_driver #
-            inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-            fvi, aw, _, _ = anchor_load_driver(inpath)
-            self.face_vertex_index = torch.from_numpy(fvi).long()
-            self.anchor_weight = torch.from_numpy(aw).float()
-            
-            anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-            palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-            hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-            # self.hand_palm_vertex_mask for hand palm mask #
-            self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
-        
-        
-        ## actions taken 
-        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
-        # os.makedirs(self.clip_sv_folder, exist_ok=True)
-
-        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
-        # #### filter files_clean here ####
-        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
-        
-        files_clean = [self.seq_path]
-        
-        # load the file # 
-        # rot_r = seqs_data['rot_r'] # 
-        # trans_r = seqs_data['trans_r']
-        # pose_r = seqs_data['pose_r']
-        # shape_r = seqs_data['shape_r']
-        
-        # side = 'right'
-        
-        for i_f, f in enumerate(files_clean):
-            cur_frame = np.load(f, allow_pickle=True).item() # xdict # 
-            self.clips.append(cur_frame)
-            # self.len
-        
-        # if self.load_meta:
-          
-        #     for i_f, f in enumerate(files_clean): ### train, val, test clip, clip_len ###
-        #     # for 
-        #         # if split != 'train' and split != 'val' and i_f >= 100:
-        #         #     break
-        #         # if split == 'train':
-        #             # print(f"loading {i_f} / {len(files_clean)}")
-        #         print(f"loading {i_f} / {len(files_clean)}")
-        #         base_nm_f = os.path.basename(f)
-        #         base_name_f = base_nm_f.split(".")[0]
-        #         cur_clip_meta_data_sv_fn = f"{base_name_f}_meta_data.npy"
-        #         cur_clip_meta_data_sv_fn = os.path.join(data_folder, split, cur_clip_meta_data_sv_fn)
-        #         cur_clip_meta_data = np.load(cur_clip_meta_data_sv_fn, allow_pickle=True).item()
-        #         cur_clip_len = cur_clip_meta_data['clip_len']
-        #         # clip_len = (cur_clip_len - window_size) // step_size + 1
-        #         # clip_len = cur_clip_len
-                
-        #         self.clips.append(self.load_clip_data(i_f, f=f)) ## add current clip ##
-        #         # self.clips.append((self.len, self.len+clip_len,  f
-        #         #     ))
-        #         clip_len = self.clips[i_f][3][3].shape[0]
-        #         self.len += clip_len # len clip len
-        #         self.len = 81
-                
-        # else:
-        #     for i_f, f in enumerate(files_clean):
-        #         if split == 'train':
-        #             print(f"loading {i_f} / {len(files_clean)}")
-        #         if split != 'train' and i_f >= 100:
-        #             break
-        #         if args is not None and args.debug and i_f >= 10:
-        #             break
-        #         clip_clean = np.load(f)
-        #         pert_folder_nm = split + '_pert'
-        #         if args is not None and not args.use_pert:
-        #             pert_folder_nm = split
-        #         clip_pert = np.load(os.path.join(data_folder, pert_folder_nm, os.path.basename(f)))
-        #         clip_len = (len(clip_clean) - window_size) // step_size + 1
-        #         sv_clip_pert = {}
-        #         for i_idx in range(6):
-        #             sv_clip_pert[f'f{i_idx + 1}'] = clip_pert[f'f{i_idx + 1}']
-                
-        #         ### sv clip pert, 
-        #         ##### load subj params #####
-        #         pure_file_name = f.split("/")[-1].split(".")[0]
-        #         pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                        
-        #         subj_params_fn = os.path.join(self.subj_data_folder, split, pure_subj_params_fn)
-        #         subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-        #         rhand_transl = subj_params["rhand_transl"]
-        #         rhand_betas = subj_params["rhand_betas"]
-        #         rhand_pose = clip_clean['f2'] ## rhand pose ##
-                
-        #         pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-        #         pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        #         ##### load subj params #####
-                
-        #         # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        #         # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        #         ### pert and clean pair for encoding and decoding ###
-        #         self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #             [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #             # subj_corr_data, pert_subj_corr_data
-        #             ))
-        #         # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
-        #         #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #         #     # subj_corr_data, pert_subj_corr_data
-        #         #     ))
-        #         self.len += clip_len # len clip len
-        
-        
-        # self.clips.sort(key=lambda x: x[0])
-    
-    def uinform_sample_t(self):
-        t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
-        return t
-    
-    def load_clip_data(self, clip_idx, f=None):
-        if f is None:
-          cur_clip = self.clips[clip_idx]
-          if len(cur_clip) > 3:
-              return cur_clip
-          f = cur_clip[2]
-        clip_clean = np.load(f)
-        # pert_folder_nm = self.split + '_pert'
-        pert_folder_nm = self.split
-        # if not self.use_pert: # clip data #
-        #     pert_folder_nm = self.split
-        # clip_pert = np.load(os.path.join(self.data_folder, pert_folder_nm, os.path.basename(f)))
-        
-        
-        ##### load subj params #####
-        pure_file_name = f.split("/")[-1].split(".")[0]
-        pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                
-        subj_params_fn = os.path.join(self.subj_data_folder, self.split, pure_subj_params_fn)
-        subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-        rhand_transl = subj_params["rhand_transl"]
-        rhand_betas = subj_params["rhand_betas"]
-        rhand_pose = clip_clean['f2'] ## rhand pose ##
-        
-        object_global_orient = clip_clean['f5'] ## clip_len x 3 --> orientation 
-        object_trcansl = clip_clean['f6'] ## cliplen x 3 --> translation
-        
-        object_idx = clip_clean['f7'][0].item()
-        
-        pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-        pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        ##### load subj params #####
-        
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
-        # maxx_clip_len = 
-        loaded_clip = (
-            0, rhand_transl.shape[0], clip_clean,
-            [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
-        )
-        # self.clips[clip_idx] = loaded_clip
-        
-        return loaded_clip
-        
-        # self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #     # subj_corr_data, pert_subj_corr_data
-        #     ))
-        
-    def get_idx_to_mesh_data(self, obj_id):
-        if obj_id not in self.id2meshdata:
-            obj_nm = self.id2objmesh[obj_id]
-            obj_mesh = trimesh.load(obj_nm, process=False) # obj mesh obj verts 
-            obj_verts = np.array(obj_mesh.vertices)
-            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-            obj_faces = np.array(obj_mesh.faces)
-            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
-        return self.id2meshdata[obj_id]
-
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
-    def __getitem__(self, index): # get item; articulated objects? #
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        i_c = 0
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
-
-        # object_id = c[3][-1]
-        # object_name = self.id2objmeshname[object_id]
-        
-        #  self.start_idx = args.start_idx
-        # start_idx = 0  # 
-        start_idx = self.args.start_idx
-        # start_idx = index * self.step_size
-        # if start_idx + self.window_size > self.len:
-        #     start_idx = self.len - self.window_size
-        
-        # and crop data sequences here ### 
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        print(f"start_idx: {start_idx}, window_size: {self.window_size}")
-        # data = c[2][start_idx:start_idx+self.window_size]
-        # # object_global_orient = self.data[index]['f5']
-        # # object_transl = self.data[index]['f6'] #
-        # object_global_orient = data['f5'] ### get object global orientations ###
-        # object_trcansl = data['f6']
-        # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        ########## pred object orient and object orient ##########
-        # object_global_orient = c["obj_rot"] # num_frames x 3 
-        # object_transl = c["obj_trans"] # num_frames x 3
-        
-        object_global_orient = c["pred.object.rot"].detach().cpu().numpy()
-        object_transl = c["pred.object.cam_t"].detach().cpu().numpy()
-        
-        print(f"object_global_orient: {object_global_orient.shape}, object_transl: {object_transl.shape}")
-        
-        # object_global_orient, object_transl #
-        object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        object_transl = object_transl[start_idx: start_idx + self.window_size]
-        
-        # print(f"object_global_orient: {object_global_orient.shape}, object_transl: {object_transl.shape}")
-        
-        object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        # object_pc_tmp = c["verts.object"][start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
-        # pred.object.v.cam
-        object_pc_tmp = c["pred.object.v.cam"].detach().cpu().numpy()[start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_transl = np.mean(object_pc_tmp, axis=1)
-        
-        #### orientation matrices ####
-        object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        
-        # object_global_orient_mtx_th = torch.eye(3).float().unsqueeze(0).repeat(object_global_orient_mtx_th.size(0), 1, 1).contiguous()
-        
-        object_trcansl_th = torch.from_numpy(object_transl).float()
-        # object_trcansl_th = torch.zeros_like(object_trcansl_th)
-        # pert_subj_params = c[4]
-        
-        st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx ##
-        
-        if self.args.use_left:
-            # f'{tag}.mano.pose.r'
-            tot_rhand_pose_gt = c[f"pred.mano.pose.l"].detach().cpu().numpy() ### nn_frames x nn_poses
-            if len(tot_rhand_pose_gt.shape) == 3:
-                tot_rhand_pose_gt = tot_rhand_pose_gt.reshape(tot_rhand_pose_gt.shape[0], -1)
-            rhand_global_orient_gt, rhand_pose_gt = tot_rhand_pose_gt[:, :3], tot_rhand_pose_gt[:, 3:]
-            # rhand_global_orient_gt, rhand_pose_gt = c["rot_l"], c["pose_l"]
-            
-            print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-            rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-            print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-            rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-            
-            rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-            rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-            
-            # rhand_transl, rhand_betas = c["trans_l"], c["shape_l"][0]
-            rhand_transl, rhand_betas = c[f"pred.mano.cam_t.l"].detach().cpu().numpy(), c[f"pred.mano.beta.l"].detach().cpu().numpy()
-            rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas[0] # get transl and betas #
-            
-            # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-            rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-            rhand_betas = rhand_betas.reshape(-1).astype(np.float32) ## pred.mano.cam_t.l ###
-        else:
-            tot_rhand_pose_gt = c[f"pred.mano.pose.r"].detach().cpu().numpy() ### nn_frames x nn_poses
-            if len(tot_rhand_pose_gt.shape) == 3:
-                tot_rhand_pose_gt = tot_rhand_pose_gt.reshape(tot_rhand_pose_gt.shape[0], -1)
-            rhand_global_orient_gt, rhand_pose_gt = tot_rhand_pose_gt[:, :3], tot_rhand_pose_gt[:, 3:]
-            # rhand_global_orient_gt, rhand_pose_gt = c["rot_l"], c["pose_l"]
-            
-            print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-            rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-            print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-            rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-            
-            rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-            rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-            
-            # rhand_transl, rhand_betas = c["trans_l"], c["shape_l"][0]
-            rhand_transl, rhand_betas = c[f"pred.mano.cam_t.r"].detach().cpu().numpy(), c[f"pred.mano.beta.r"].detach().cpu().numpy()
-            rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas[0] # get transl and betas #
-            
-            # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-            rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-            rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
-        
-        # # orientation rotation matrix #
-        # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
-        # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
-        # # orientation rotation matrix #
-        # global orient var #
-        rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
-        rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
-        rhand_beta_var = torch.from_numpy(rhand_betas).float()
-        rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
-        # R.from_rotvec(obj_rot).as_matrix()
-        
-        ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
-        #### ==== get random augmented pose, rot, transl ==== ####
-        # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.00, 0.00
-        # noise scale #
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3 # scale 1 for the standard scale
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.4 ### scale 3 for the standard scale ###
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.5
-        # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
-        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # ### === get and save noise vectors === ###
-        # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
-        aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
-        aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
-        aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
-        if self.args.pert_type == "uniform":
-            aug_pose_var = (torch.rand_like(rhand_pose_var) - 0.5) * aug_pose
-            aug_global_orient_var = (torch.rand_like(rhand_global_orient_var) - 0.5) * aug_rot
-        elif self.args.pert_type == "beta": # 
-            dist_beta = torch.distributions.beta.Beta(torch.tensor([8.]), torch.tensor([2.]))
-            print(f"here!")
-            aug_pose_var = dist_beta.sample(rhand_pose_var.size()).squeeze(-1) * aug_pose
-            aug_global_orient_var = dist_beta.sample(rhand_global_orient_var.size()).squeeze(-1) * aug_rot
-            print(f"aug_pose_var: {aug_pose_var.size()}, aug_global_orient_var: {aug_global_orient_var.size()}")
-            
-        # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
-        # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
-        # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
-        # ### creat augmneted orientations, pose, and transl ###
-        rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
-        rnd_aug_pose_var = rhand_pose_var + aug_pose_var
-        rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
-        
-        if self.args.use_left:
-            cur_mano_layer = self.lft_mano_layer
-        else:
-            cur_mano_layer = self.rgt_mano_layer
-        
-        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_betas_var, rhand_beta_var
-        rhand_verts, rhand_joints = cur_mano_layer(
-            torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
-        )
-        ### rhand_joints: for joints ###
-        rhand_verts = rhand_verts * 0.001
-        rhand_joints = rhand_joints * 0.001
-        
-        # rhand_anchors, pert_rhand_anchors #
-        # rhand_anchors, canon_rhand_anchors #
-        # use_anchors, self.hand_palm_vertex_mask #
-        if self.use_anchors: # # rhand_anchors: bsz x nn_hand_anchors x 3 #
-            # rhand_anchors = rhand_verts[:, self.hand_palm_vertex_mask] # nf x nn_anchors x 3 --> for the anchor points ##
-            rhand_anchors = recover_anchor_batch(rhand_verts, self.face_vertex_index, self.anchor_weight.unsqueeze(0).repeat(self.window_size, 1, 1))
-            # print(f"rhand_anchors: {rhand_anchors.size()}") ### recover rhand verts here ###
-        
-        
-        
-        if self.use_rnd_aug_hand: ## rnd aug pose var, transl var #
-            # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-            pert_rhand_global_orient_var = rnd_aug_global_orient_var.clone()
-            pert_rhand_pose_var = rnd_aug_pose_var.clone()
-            pert_rhand_transl_var = rnd_aug_transl_var.clone()
-            # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient_var.numpy())
-        
-        # # pert_rhand_betas_var
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_joints --> for rhand joints in the camera frmae ###
-        pert_rhand_verts, pert_rhand_joints = cur_mano_layer(
-            torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), pert_rhand_transl_var
-        )
-        pert_rhand_verts = pert_rhand_verts * 0.001 # verts 
-        pert_rhand_joints = pert_rhand_joints * 0.001 # joints
-        
-        # rhand_joints = torch.matmul(
-        #     rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        # )
-        if len(self.predicted_info_fn) > 0:
-            pert_rhand_joints = self.predicted_joints.clone() ### nn_frames x nn_joints x 3 ###
-            pert_rhand_joints = torch.matmul(pert_rhand_joints, object_global_orient_mtx_th) + object_trcansl_th.unsqueeze(1)
-        
-        if self.use_anchors:
-            # pert_rhand_anchors = pert_rhand_verts[:, self.hand_palm_vertex_mask]
-            pert_rhand_anchors = recover_anchor_batch(pert_rhand_verts, self.face_vertex_index, self.anchor_weight.unsqueeze(0).repeat(self.window_size, 1, 1))
-            # print(f"rhand_anchors: {rhand_anchors.size()}") ### recover rhand verts here ###
-        
-        # use_canon_joints
-        
-        canon_pert_rhand_verts, canon_pert_rhand_joints = cur_mano_layer(
-            torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        )
-        canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
-        canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
-        
-        # if self.use_anchors:
-        #     # canon_pert_rhand_anchors = canon_pert_rhand_verts[:, self.hand_palm_vertex_mask]
-        #     canon_pert_rhand_anchors = recover_anchor_batch(canon_pert_rhand_verts, self.face_vertex_index, self.anchor_weight.unsqueeze(0).repeat(self.window_size, 1, 1))
-        
-        # canon_pert_rhand_verts, canon_pert_rhand_joints = self.mano_layer(
-        #     torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
-        #     pert_rhand_betas_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        # )
-        # canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
-        # canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
-        
-        # ### Relative positions from base points to rhand joints ###
-        # object_pc = c["verts.object"][start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_pc = c["pred.object.v.cam"].detach().cpu().numpy()[start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
-
-        # if self.args.scale_obj > 1:
-        #     object_pc = object_pc * self.args.scale_obj
-        # object_normal = data['f4'].reshape(self.window_size, -1, 3).astype(np.float32)
-        
-        object_normal = np.zeros_like(object_pc) ### 
-        object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
-        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
-        
-        
-        # ws x nnjoints x nnobjpts #
-        dist_rhand_joints_to_obj_pc = torch.sum(
-            (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        )
-        # dist_pert_rhand_joints_obj_pc = torch.sum(
-        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        # )
-        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
-        
-        
-        # if we just set a parameter `use_arti_obj`? #
-        
-        # if not self.args.use_arti_obj:
-        #     object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        #     nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1) # object pc #
-        #     # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-        #     dist_object_pc_nearest_pcs = torch.sum( # - nearesst obj pc # # ws x nn_obj x 1 x 3 --- ws x 1 x nnjts x 3 --> ws x nn_obj x nn_jts
-        #         (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1 # ws x nn_obj x nn_jts #
-        #     ) 
-        #     dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs # nearest to all pts in all frames ## 
-        #     dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs # nn_obj_pcs # nn_obj_pcs #
-        #     # # dist_threshold = 0.01 # threshold 
-        #     dist_threshold = self.dist_threshold
-        #     # # dist_threshold for pc_nearest_pcs # dist object pc nearest pcs #
-        #     dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-            
-        #     # # base_pts_mask: nn_obj_pcs #
-        #     base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
-        #     # # nn_base_pts x 3 -> torch tensor #
-        #     base_pts = object_pc_th[0][base_pts_mask]
-        #     # # base_pts_bf_sampling = base_pts.clone()
-        #     base_normals = object_normal_th[0][base_pts_mask]
-            
-        #     nn_base_pts = self.nn_base_pts
-        #     base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
-        #     base_pts_idxes = base_pts_idxes[:nn_base_pts]
-            
-        #     # ### get base points ### # base_pts and base_normals #
-        #     base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
-        #     base_normals = base_normals[base_pts_idxes]
-            
-            
-        #     # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        #     base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        #     base_pts_transl = object_trcansl_th[0] # 3
-            
-        #     base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-        #         ) # .transpose(0, 1)
-        #     base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-        #         ) # .transpose(0, 1)
-        # else:
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1) # nearest_obj_pcs: ws x nn_jts x 3 --> for nearet obj pcs # 
-        # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands # #
-        dist_object_pc_nearest_pcs = torch.sum( # - nearesst obj pc # # ws x nn_obj x 1 x 3
-            (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1 # ws x nn_obj x nn_jts #
-        ) 
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # ws x nn_obj #
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
-        # # dist_threshold = 0.01 # threshold 
-        dist_threshold = self.dist_threshold
-        # # dist_threshold for pc_nearest_pcs # dist object pc nearest pcs #
-        dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-        
-        # # base_pts_mask: nn_obj_pcs #
-        base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold) # nn_obj_pcs -> nearest_pcs mask #
-        base_pts = object_pc_th[:, base_pts_mask] # ws x nn_valid_obj_pcs x 3 #
-        base_normals = object_normal_th[:, base_pts_mask] # ws x nn_valid_obj_pcs x 3 #
-        nn_base_pts = self.nn_base_pts
-        base_pts_idxes = utils.farthest_point_sampling(base_pts[0:1], n_sampling=nn_base_pts)
-        base_pts_idxes = base_pts_idxes[:nn_base_pts]
-        base_pts = base_pts[:, base_pts_idxes]
-        base_normals = base_normals[:, base_pts_idxes]
-        
-        base_pts_global_orient_mtx = object_global_orient_mtx_th # ws x 3 x 3 #
-        base_pts_transl = object_trcansl_th # ws x 3 # 
-        base_pts = torch.matmul(
-            (base_pts - base_pts_transl.unsqueeze(1)), base_pts_global_orient_mtx.transpose(1, 2) # ws x nn_base_pts x 3 --> ws x nn_base_pts x 3 #
-        )
-        base_normals = torch.matmul(
-            base_normals, base_pts_global_orient_mtx.transpose(1, 2)  # ws x nn_base_pts x 3 
-        )
-        
-        # # if self.debug:
-        # #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        # base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        # base_pts_transl = object_trcansl_th[0] # 3
-        
-        # # if self.dir_stra == "rot_angles": ## rot angles ##
-        # #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # # if self.canon_obj:
-        #     ## reverse transform base points ###
-        #     ## canonicalize base points and base normals ###
-        # base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-        #     ) # .transpose(0, 1)
-        # base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-        #     ) # .transpose(0, 1)
-        
-        
-        rhand_joints = torch.matmul(
-            rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        pert_rhand_joints = torch.matmul(
-            pert_rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        if self.args.use_anchors:
-            # rhand_anchors, pert_rhand_anchors #
-            rhand_anchors = torch.matmul(
-                rhand_anchors - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-            )
-            pert_rhand_anchors = torch.matmul(
-                pert_rhand_anchors - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-            )
-        
-        object_pc_th = torch.matmul(
-            object_pc_th - object_trcansl_th.unsqueeze(1),  object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        ''' normalization strategy xxx --- data scaling '''
-        # base_pts = base_pts * 5.
-        # rhand_joints = rhand_joints * 5.
-        ''' Normlization stratey xxx --- data scaling '''
-        
-        if self.args.use_left: ### rhand_joints: nn_frames x nn_joints x 3 # base_pts: nn_frames x nn_jbase_pts x 3 # 
-            pert_rhand_joints[:, :, -1] = -1. * pert_rhand_joints[:, :, -1] 
-            base_pts[:, :, -1] = -1. * base_pts[:, :, -1] 
-            
-        
-        
-        # base_pts = sampled_base_pts
-        # sampled_base_pts = base_pts
-        
-        ''' Relative positions and distances normalization, strategy 1 '''
-        # rhand_joints = rhand_joints * 5.
-        # base_pts = base_pts * 5.
-        ''' Relative positions and distances normalization, strategy 1 '''
-        # sampled_base_pts: nn_base_pts x 3 #
-        # nf x nnj x nnb x 3 #
-        # nf x nnj x nnb x 3 #
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - sampled_base_pts.unsqueeze(0).unsqueeze(0)
-        # # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        # dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        if not self.args.use_arti_obj:
-            # nf x nnj x nnb x 3 # 
-            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-            # # dist_base_pts_to...: ws x nn_joints x nn_sampling # ### dit bae tps to rhand joints ###
-            dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        else:
-            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(1) # ws x nn_joints x nn_base_pts x 3 #
-            # dist_base_pts_to_rhand_joints: ws x nn_joints x nn_base_pts -> the distance from base points to joint points #
-            dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(1) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        
-        
-        # k of the # # nf x nnj x nnb # # nnj x nnb # nnb -> 
-        ## TODO: other choices of k_f? ##
-        k_f = 1.
-        # relative #
-        l2_rel_base_pts_to_rhand_joints = torch.norm(rel_base_pts_to_rhand_joints, dim=-1)
-        ### att_forces ##
-        att_forces = torch.exp(-k_f * l2_rel_base_pts_to_rhand_joints) # nf x nnj x nnb #
-        
-        att_forces = att_forces[:-1, :, :]
-        # rhand_joints: ws x nnj x 3 # -> (ws - 1) x nnj x 3 ## rhand_joints ##
-        
-        
-        rhand_joints_disp = pert_rhand_joints[1:, :, :] - pert_rhand_joints[:-1, :, :]
-        
-        # rhand_joints_disp = rhand_joints[1:, :, :] - rhand_joints[:-1, :, :]
-        # 
-        if not self.args.use_arti_obj:
-            # distance -- base_normalss,; (ws - 1) x nnj x nnb x 3 -
-            signed_dist_base_pts_to_rhand_joints_along_normal = torch.sum(
-                base_normals.unsqueeze(0).unsqueeze(0) * rhand_joints_disp.unsqueeze(2), dim=-1
-            )
-            
-            # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
-            rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals.unsqueeze(0).unsqueeze(0)
-        else:
-            signed_dist_base_pts_to_rhand_joints_along_normal = torch.sum(
-                base_normals.unsqueeze(1)[:-1] * rhand_joints_disp.unsqueeze(2), dim=-1
-            )
-            # unsqueeze the dimensiton 1 #
-            rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals.unsqueeze(1)[:-1]
-        # nf x nnj x nnb x 3 --> rel_vt_normals ## nf x nnj x nnb
-        # # (ws - 1) x nnj x nnb # # (ws - 1) x nnj x 3 --> 
-        
-        # nf x nnj x nnb ---> dist_vt_normals -> nf x nnj x nnb # # torch.sqrt() ##
-        dist_base_pts_to_rhand_joints_vt_normal = torch.sqrt(torch.sum(
-            rel_base_pts_to_rhand_joints_vt_normal ** 2, dim=-1
-        ))
-        
-        k_a = 1.
-        k_b = 1. 
-        # k and # give me a noised sequence ... #
-        # (ws - 1) x nnj x nnb # --> (ws - 1) x nnj x nnb # nnj x nnb # 
-        # add noise -> chagne of the joints displacements 
-        # -> change of along_normalss energies and vertical to normals energies #
-        # -> change of energy taken to make the displacements #
-        # jts_to_base_pts energy in the noisy sequence #
-        # jts_to_base_pts energy in the clean sequence #
-        # vt-normal, along_normal #
-        # TODO: the normalization strategy: 1) per-instnace; 2) per-category; #3
-        # att_forces: (ws - 1) x nnj x nnb # # 
-        e_disp_rel_to_base_along_normals = k_a * att_forces * torch.abs(signed_dist_base_pts_to_rhand_joints_along_normal)
-        # (ws - 1) x nnj x nnb # -> dist vt normals #
-        e_disp_rel_to_baes_vt_normals = k_b * att_forces * dist_base_pts_to_rhand_joints_vt_normal
-        # base_pts; base_normals; 
-        
-        
-        ''' normalization sstrategy 1 ''' # 
-        # per_frame_avg_disp_along_normals, per_frame_std_disp_along_normals # 
-        # per_frame_avg_disp_vt_normals, per_frame_std_disp_vt_normals #
-        # e_disp_rel_to_base_along_normals, e_disp_rel_to_baes_vt_normals #
-        # per_frame_avg_disp_along_normalss, per_frame_std_disp_along_normalss # 
-        # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
-        disp_ws, nnj, nnb = e_disp_rel_to_base_along_normals.shape[:3]
-        # disp_ws x nnf x nnb x 3 #  -> disp_ws x nnj x nnb
-        per_frame_avg_disp_along_normals = torch.mean( # avg over all frmaes #
-            e_disp_rel_to_base_along_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True # for each point #
-        ) # .unsqueeze(0)
-        per_frame_std_disp_along_normals = torch.std( # std over all frames #
-            e_disp_rel_to_base_along_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
-        ) # .unsqueeze(0)
-        per_frame_avg_disp_vt_normals = torch.mean( # avg over all frmaes #
-            e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True # for each point #
-        ) # .unsqueeze(0)
-        per_frame_std_disp_vt_normals = torch.std( # std over all frames #
-            e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
-        ) # .unsqueeze(0)
-        # per_frame_avg_joints_dists_rel = torch.mean(
-        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-        # ).unsqueeze(0)
-        # per_frame_std_joints_dists_rel = torch.std(
-        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-        # ).unsqueeze(0)
-        ### normalizaed aong normals and vat normals  # ws x nnj x nnb 
-        e_disp_rel_to_base_along_normals = (e_disp_rel_to_base_along_normals - per_frame_avg_disp_along_normals) / per_frame_std_disp_along_normals
-        e_disp_rel_to_baes_vt_normals = (e_disp_rel_to_baes_vt_normals - per_frame_avg_disp_vt_normals) / per_frame_std_disp_vt_normals
-        # enrgy temrs #
-        ''' normalization sstrategy 1 ''' # 
-        
-        
-        
-        
-        
-        if self.denoising_stra == "rep":
-            ''' Relative positions and distances normalization, strategy 3 '''
-            # # for each point normalize joints over all frames #
-            # # rel_base_pts_to_rhand_joints: nf x nnj x nnb x 3 #
-            per_frame_avg_joints_rel = torch.mean(
-                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_std_joints_rel = torch.std(
-                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_avg_joints_dists_rel = torch.mean(
-                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_std_joints_dists_rel = torch.std(
-                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            # max xyz vlaues for the relative positions, maximum, minimum distances for them #
-            
-            
-            # ''' Stra 2 -> per frame with joints '''
-            # # nf x nnj x nnb x 3 #
-            # ws, nnf , nnb = rel_base_pts_to_rhand_joints.shape[:3]
-            # per_frame_avg_joints_rel = torch.mean(
-            #     rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True # for each point #
-            # ).unsqueeze(0)
-            # per_frame_std_joints_rel = torch.std(
-            #     rel_base_pts_to_rhand_joints.view(ws * nnf, nnb, 3), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            # per_frame_avg_joints_dists_rel = torch.mean(
-            #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            # per_frame_std_joints_dists_rel = torch.std(
-            #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-            # ).unsqueeze(0)
-            
-            if not self.args.use_arti_obj:
-                # # nf x nnj x nnb x 3 # 
-                rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-                # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-                dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-            else:
-                # # nf x nnj x nnb x 3 # 
-                rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(1)
-                # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-                dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(1) * rel_base_pts_to_rhand_joints, dim=-1)
-                
-            
-            rel_base_pts_to_rhand_joints = (rel_base_pts_to_rhand_joints - per_frame_avg_joints_rel) / per_frame_std_joints_rel
-            dist_base_pts_to_rhand_joints = (dist_base_pts_to_rhand_joints - per_frame_avg_joints_dists_rel) / per_frame_std_joints_dists_rel
-            stats_dict = {
-                'per_frame_avg_joints_rel': per_frame_avg_joints_rel,
-                'per_frame_std_joints_rel': per_frame_std_joints_rel,
-                'per_frame_avg_joints_dists_rel': per_frame_avg_joints_dists_rel,
-                'per_frame_std_joints_dists_rel': per_frame_std_joints_dists_rel,
-            }
-            ''' Relative positions and distances normalization, strategy 3 '''
-        
-        # if self.denoising_stra == "motion_to_rep": # motion_to_rep #
-        #     pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
-        
-        
-        ''' Relative positions and distances normalization, strategy 4 '''
-        # rel_base_pts_to_rhand_joints = rel_base_pts_to_rhand_joints / (self.maxx_rel - self.minn_rel).unsqueeze(0).unsqueeze(0).unsqueeze(0)
-        # dist_base_pts_to_rhand_joints = dist_base_pts_to_rhand_joints / (self.maxx_dists - self.minn_dists).unsqueeze(0).unsqueeze(0).unsqueeze(0).squeeze(-1)
-        ''' Relative positions and distances normalization, strategy 4 '''
-        
-        # 
-        # rt_pert_rhand_verts =  pert_rhand_verts
-        # rt_rhand_verts = rhand_verts
-        # rt_pert_rhand_joints = pert_rhand_joints
-        
-        # rt_rhand_joints = rhand_joints ## rhand_joints ##
-        # # rt_rhand_joints = pert_rhand_joints
-        
-        
-        # # rt_rhand_joints: nf x nnjts x 3 # ### pertrhandjoints
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1s
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-        
-        ''' Obj data '''
-        # obj_verts, obj_normals, obj_faces = self.get_idx_to_mesh_data(object_id) # obj_verts, normals #
-        # obj_verts = torch.from_numpy(obj_verts).float() # nn_verts x 3 #
-        # obj_normals = torch.from_numpy(obj_normals).float() # 
-        # obj_faces = torch.from_numpy(obj_faces).long() # nn_faces x 3 ## -> triangels indexes ##
-        ''' Obj data '''
-        
-        # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-            
-            
-        
-        caption = "apple"
-        # pose_one_hots, word_embeddings #
-        
-        # object_global_orient_th, object_transl_th #
-        object_global_orient_th = torch.from_numpy(object_global_orient).float()
-        object_transl_th = torch.from_numpy(object_transl).float()
-        
-        
-        # pert_rhand_anchors, rhand_anchors
-        ''' Construct data for returning '''
-        rt_dict = {
-            'base_pts': base_pts, # th
-            'base_normals': base_normals, # th
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints, # th, ws x nnj x nnb x 3 
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints, # th, ws x nnj x nnb
-            # 'rhand_joints': rhand_joints,
-            'gt_rhand_joints': rhand_joints, ## rhand joints ###
-            'rhand_joints': pert_rhand_joints if not self.args.use_canon_joints else canon_pert_rhand_joints, # rhand_joints #
-            'rhand_verts': rhand_verts,
-            # 'word_embeddings': word_embeddings,
-            # 'pos_one_hots': pos_one_hots,
-            'caption': caption,
-            # 'sent_len': sent_len,
-            # 'm_length': m_length,
-            # 'text': '_'.join(tokens),
-            # 'object_id': object_id, # int value
-            'lengths': rel_base_pts_to_rhand_joints.size(0),
-            'object_global_orient': object_global_orient_th,
-            'object_transl': object_transl_th,
-            'st_idx': 0,
-            'ed_idx': self.window_size,
-            'pert_verts': pert_rhand_verts,
-            'verts': rhand_verts,
-            # 'obj_verts': obj_verts,
-            # 'obj_normals': obj_normals,
-            # 'obj_faces': obj_faces, # nnfaces x 3 #
-            'obj_rot': object_global_orient_mtx_th, # ws x 3 x 3 --> 
-            'obj_transl': object_trcansl_th, # ws x 3 --> obj transl 
-            'object_pc_th': object_pc_th, ### get the object_pc_th for object_pc_th 
-            ## sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns ##
-            # 'sampled_base_pts_nearest_obj_pc': sampled_base_pts_nearest_obj_pc, 
-            # 'sampled_base_pts_nearest_obj_vns': sampled_base_pts_nearest_obj_vns,
-            'per_frame_avg_disp_along_normals': per_frame_avg_disp_along_normals,
-            'per_frame_std_disp_along_normals': per_frame_std_disp_along_normals,
-            'per_frame_avg_disp_vt_normals': per_frame_avg_disp_vt_normals,
-            'per_frame_std_disp_vt_normals': per_frame_std_disp_vt_normals,
-            'e_disp_rel_to_base_along_normals': e_disp_rel_to_base_along_normals,
-            'e_disp_rel_to_baes_vt_normals': e_disp_rel_to_baes_vt_normals, # 
-        }
-        
-        if self.use_anchors: ## update rhand anchors here ##
-            rt_dict.update(
-                {
-                    'rhand_anchors': rhand_anchors,
-                    'pert_rhand_anchors': pert_rhand_anchors,
-                }
-            )
-        
-        try:
-            # rt_dict['per_frame_avg_joints_rel'] = 
-            rt_dict.update(stats_dict)
-        except:
-            pass
-        ''' Construct data for returning '''
-        
-        return rt_dict
-
-
-        if self.dir_stra == 'rot_angles':
-            # tangent_orient_vec # nn_base_pts x 3 #
-            rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
-        
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
-
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
-
-    def __len__(self):
-        cur_len = self.len // self.step_size
-        if cur_len * self.step_size < self.len:
-          cur_len += 1
-        cur_len = 1
-        return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
-
-
-
-
-# GRAB v19 arctic ###
+# TACO #
 class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
     def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
         #### GRAB dataset ####
@@ -7142,9 +3927,9 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
         ## predicted infos fn ##
         self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
+        self.subj_data_folder = data_folder
         # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        self.mano_path = "manopth/mano/models" ### mano_path
         ## mano paths ##
         self.aug = True
         self.use_anchors = False
@@ -7153,7 +3938,7 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         self.use_anchors = args.use_anchors
         
         self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
+        obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
         for i, fn in enumerate(obj_meshes):
@@ -7520,9 +4305,6 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
         #### ==== get random augmented pose, rot, transl ==== ####
         # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
         aug_trans, aug_rot, aug_pose = 0.000, 0.00, 0.00
         # noise scale #
         # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3 # scale 1 for the standard scale
@@ -8118,865 +4900,3 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
 
 
 
-
-# GRAB_Dataset_V19_From_Evaluated_Info --> from evaluated information 
-class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
-    def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
-        #### GRAB dataset #### ## GRAB dataset
-        self.clips = []
-        self.len = 0
-        self.window_size = window_size
-        self.step_size = step_size
-        self.num_points = num_points
-        self.split = split
-        
-        
-        
-        split = args.single_seq_path.split("/")[-2].split("_")[0]
-        self.split = split
-        print(f"split: {self.split}")
-        
-        self.model_type = 'v1_wsubj_wjointsv25'
-        self.debug = False
-        # self.use_ambient_base_pts = args.use_ambient_base_pts
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        self.num_sche_steps = 100
-        self.w_vectorizer = w_vectorizer
-        self.use_pert = True
-        self.use_rnd_aug_hand = True
-        
-        self.args = args
-        
-        self.denoising_stra = args.denoising_stra ## denoising_stra!
-        
-        self.seq_path = args.single_seq_path ## single seq path ##
-        
-        self.inst_normalization = args.inst_normalization
-        
-        
-        # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
-        
-        
-        ## the predicted_info_fn
-        predicted_info_fn = args.predicted_info_fn
-        # load data from predicted information #
-        data = np.load(predicted_info_fn, allow_pickle=True).item()
-        self.wpredverts = False
-        if 'optimized_out_hand_joints_ne' in data: ### joints_ne for joints ##
-            print("Loading from optimized_out_hand_joints_ne!!!")
-            outputs = data['optimized_out_hand_joints_ne'] # outputs of the o
-            self.wpredverts = False
-        elif 'hand_joints' in data:
-            print(f"Loading from hand_joints!!!!")
-            outputs = data['hand_joints'] # ws x nn_joints x 3 #
-            predicted_hand_verts = data['hand_verts'] 
-            # 
-            self.wpredverts = True
-            if len(args.predicted_info_fn_jts_only) > 0:
-                print(f"Loading from predicted_info_fn_jts_only!!!!!")
-                cur_predicted_info_fn_jts_only = np.load(args.predicted_info_fn_jts_only, allow_pickle=True).item()
-                tot_obj_rot = cur_predicted_info_fn_jts_only['tot_obj_rot'][0] # ws x 3 x 3 #
-                tot_obj_transl = cur_predicted_info_fn_jts_only['tot_obj_transl'][0] # ws x 3 #
-                ws = tot_obj_transl.shape[0]
-                outputs = np.matmul( # the outputs: ws x nn_joints x 3 #
-                    outputs - tot_obj_transl.reshape(ws, 1, 3), np.transpose(tot_obj_rot, (0, 2, 1)) #  
-                )
-                predicted_hand_verts = np.matmul( # the outputs: ws x nn_joints x 3 #
-                    predicted_hand_verts - tot_obj_transl.reshape(ws, 1, 3), np.transpose(tot_obj_rot, (0, 2, 1)) #  
-                )
-            self.predicted_hand_verts = predicted_hand_verts
-            self.predicted_hand_verts = torch.from_numpy(self.predicted_hand_verts).float()
-        else:
-            outputs = data['outputs']
-        self.predicted_hand_joints = outputs # nf x nnjoints x 3 #
-        self.predicted_hand_joints = torch.from_numpy(self.predicted_hand_joints).float()
-        # obj_verts = data['obj_verts']
-        # obj_faces = data['obj_faces']
-        # tot_base_pts = data["tot_base_pts"][0]
-        # single_obj_normals = data['single_obj_normals']
-        # self.obj_ver
-        
-        print(f"predicted_hand_joints: {self.predicted_hand_joints.shape}")
-        
-        self.start_idx = args.start_idx
-        
-        
-        self.aug_trans_T = 0.05
-        self.aug_rot_T = 0.3
-        self.aug_pose_T = 0.5
-        self.aug_zero = 1e-4 if self.model_type not in ['v1_wsubj_wjointsv24', 'v1_wsubj_wjointsv25'] else 0.01
-        
-        self.sigmas_trans = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_trans_T), self.num_sche_steps
-        ))
-        self.sigmas_rot = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_rot_T), self.num_sche_steps
-        ))
-        self.sigmas_pose = np.exp(np.linspace(
-            np.log(self.aug_zero), np.log(self.aug_pose_T), self.num_sche_steps
-        ))
-        
-        
-        self.data_folder = data_folder
-        self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj' # subj_data_folder
-        # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
-        self.aug = True
-        self.use_anchors = False
-
-        
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(self.grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmesh = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        for i, fn in enumerate(obj_meshes):
-            id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        self.id2objmesh = id2objmesh
-        self.id2meshdata = {}
-        
-        ## obj root folder; ##
-        ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
-        
-        ''' Load avg, std statistics '''
-        # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
-        # rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
-        # rel_dists_stats = np.load(rel_dists_stats_fn, allow_pickle=True).item()
-        # maxx_rel = rel_dists_stats['maxx_rel']
-        # minn_rel = rel_dists_stats['minn_rel']
-        # maxx_dists = rel_dists_stats['maxx_dists']
-        # minn_dists = rel_dists_stats['minn_dists']
-        # self.maxx_rel = torch.from_numpy(maxx_rel).float()
-        # self.minn_rel = torch.from_numpy(minn_rel).float()
-        # self.maxx_dists = torch.from_numpy(maxx_dists).float()
-        # self.minn_dists = torch.from_numpy(minn_dists).float()
-        ''' Load avg, std statistics '''
-        
-        ''' Load avg-jts, std-jts '''
-        # avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
-        # std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
-        # avg_jts = np.load(avg_jts_fn, allow_pickle=True)
-        # std_jts = np.load(std_jts_fn, allow_pickle=True)
-        # # self.avg_jts, self.std_jts #
-        # self.avg_jts = torch.from_numpy(avg_jts).float()
-        # self.std_jts = torch.from_numpy(std_jts).float()
-        ''' Load avg-jts, std-jts '''
-        
-        
-        # self.dist_stra = args.dist_stra
-        
-        self.load_meta = True
-        
-        self.dist_threshold = 0.005
-        # self.nn_base_pts = 700
-        self.nn_base_pts = args.nn_base_pts
-        print(f"nn_base_pts: {self.nn_base_pts}")
-        
-        mano_pkl_path = os.path.join(self.mano_path, 'MANO_RIGHT.pkl')
-        with open(mano_pkl_path, 'rb') as f:
-            mano_model = pickle.load(f, encoding='latin1')
-        self.template_verts = np.array(mano_model['v_template'])
-        self.template_faces = np.array(mano_model['f'])
-        self.template_joints = np.array(mano_model['J'])
-        #### finger tips; ####
-        self.template_tips = self.template_verts[[745, 317, 444, 556, 673]]
-        self.template_joints = np.concatenate([self.template_joints, self.template_tips], axis=0)
-        #### template verts ####
-        self.template_verts = self.template_verts * 0.001
-        #### template joints ####
-        self.template_joints = self.template_joints * 0.001 # nn_joints x 3 #
-        # condition on template joints for current joints #
-        
-        # self.template_joints = self.template_verts[self.hand_palm_vertex_mask]
-        
-        self.fingers_stats = [
-            [16, 15, 14, 13, 0],
-            [17, 3, 2, 1, 0],
-            [18, 6, 5, 4, 0],
-            [19, 12, 11, 10, 0],
-            [20, 9, 8, 7, 0]
-        ]
-        # 5 x 5 states, the first dimension is the finger index
-        self.fingers_stats = np.array(self.fingers_stats, dtype=np.int32)
-        self.canon_obj = True
-        
-        self.dir_stra = "vecs" # "rot_angles", "vecs"
-        # self.dir_stra = "rot_angles"
-        
-        
-        self.mano_layer = ManoLayer(
-            flat_hand_mean=True,
-            side='right',
-            mano_root=self.mano_path, # mano_root #
-            ncomps=24,
-            use_pca=True,
-            root_rot_mode='axisang',
-            joint_rot_mode='axisang'
-        )
-        
-        ## actions taken 
-        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
-        # os.makedirs(self.clip_sv_folder, exist_ok=True)
-
-        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
-        # #### filter files_clean here ####
-        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
-        
-        files_clean = [self.seq_path]
-        
-        if self.load_meta:
-          
-            for i_f, f in enumerate(files_clean): ### train, val, test clip, clip_len ###
-            # for 
-                # if split != 'train' and split != 'val' and i_f >= 100:
-                #     break
-                # if split == 'train':
-                    # print(f"loading {i_f} / {len(files_clean)}")
-                print(f"loading {i_f} / {len(files_clean)}")
-                base_nm_f = os.path.basename(f)
-                base_name_f = base_nm_f.split(".")[0]
-                cur_clip_meta_data_sv_fn = f"{base_name_f}_meta_data.npy"
-                cur_clip_meta_data_sv_fn = os.path.join(data_folder, split, cur_clip_meta_data_sv_fn)
-                cur_clip_meta_data = np.load(cur_clip_meta_data_sv_fn, allow_pickle=True).item()
-                cur_clip_len = cur_clip_meta_data['clip_len']
-                # clip_len = (cur_clip_len - window_size) // step_size + 1
-                # clip_len = cur_clip_len
-                
-                self.clips.append(self.load_clip_data(i_f, f=f)) ## add current clip ##
-                # self.clips.append((self.len, self.len+clip_len,  f
-                #     ))
-                clip_len = self.clips[i_f][3][3].shape[0]
-                self.len += clip_len # len clip len
-                self.len = 81
-                
-        else:
-            for i_f, f in enumerate(files_clean):
-                if split == 'train':
-                    print(f"loading {i_f} / {len(files_clean)}")
-                if split != 'train' and i_f >= 100:
-                    break
-                if args is not None and args.debug and i_f >= 10:
-                    break
-                clip_clean = np.load(f)
-                pert_folder_nm = split + '_pert'
-                if args is not None and not args.use_pert:
-                    pert_folder_nm = split
-                clip_pert = np.load(os.path.join(data_folder, pert_folder_nm, os.path.basename(f)))
-                clip_len = (len(clip_clean) - window_size) // step_size + 1
-                sv_clip_pert = {}
-                for i_idx in range(6):
-                    sv_clip_pert[f'f{i_idx + 1}'] = clip_pert[f'f{i_idx + 1}']
-                
-                ### sv clip pert, 
-                ##### load subj params #####
-                pure_file_name = f.split("/")[-1].split(".")[0]
-                pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                        
-                subj_params_fn = os.path.join(self.subj_data_folder, split, pure_subj_params_fn)
-                subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-                rhand_transl = subj_params["rhand_transl"]
-                rhand_betas = subj_params["rhand_betas"]
-                rhand_pose = clip_clean['f2'] ## rhand pose ##
-                
-                pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-                pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-                ##### load subj params #####
-                
-                # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-                # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-                ### pert and clean pair for encoding and decoding ###
-                self.clips.append((self.len, self.len+clip_len, clip_pert,
-                    [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                    # subj_corr_data, pert_subj_corr_data
-                    ))
-                # self.clips.append((self.len, self.len+clip_len, sv_clip_pert,
-                #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-                #     # subj_corr_data, pert_subj_corr_data
-                #     ))
-                self.len += clip_len # len clip len
-        self.clips.sort(key=lambda x: x[0])
-    
-    def uinform_sample_t(self):
-        t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
-        return t
-    
-    def load_clip_data(self, clip_idx, f=None):
-        if f is None:
-          cur_clip = self.clips[clip_idx]
-          if len(cur_clip) > 3:
-              return cur_clip
-          f = cur_clip[2]
-        clip_clean = np.load(f)
-        # pert_folder_nm = self.split + '_pert'
-        pert_folder_nm = self.split
-        # if not self.use_pert:
-        #     pert_folder_nm = self.split
-        # clip_pert = np.load(os.path.join(self.data_folder, pert_folder_nm, os.path.basename(f)))
-        
-        
-        ##### load subj params #####
-        pure_file_name = f.split("/")[-1].split(".")[0]
-        pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
-                
-        subj_params_fn = os.path.join(self.subj_data_folder, self.split, pure_subj_params_fn)
-        subj_params = np.load(subj_params_fn, allow_pickle=True).item()
-        rhand_transl = subj_params["rhand_transl"]
-        rhand_betas = subj_params["rhand_betas"]
-        rhand_pose = clip_clean['f2'] ## rhand pose ##
-        
-        object_global_orient = clip_clean['f5'] ## clip_len x 3 --> orientation 
-        object_trcansl = clip_clean['f6'] ## cliplen x 3 --> translation
-        
-        object_idx = clip_clean['f7'][0].item()
-        
-        pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
-        pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        ##### load subj params #####
-        
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
-        # maxx_clip_len = 
-        loaded_clip = (
-            0, rhand_transl.shape[0], clip_clean,
-            [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
-        )
-        # self.clips[clip_idx] = loaded_clip
-        
-        return loaded_clip
-        
-        # self.clips.append((self.len, self.len+clip_len, clip_pert,
-        #     [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas], pert_subj_params, 
-        #     # subj_corr_data, pert_subj_corr_data
-        #     ))
-        
-    def get_idx_to_mesh_data(self, obj_id):
-        if obj_id not in self.id2meshdata:
-            obj_nm = self.id2objmesh[obj_id]
-            obj_mesh = trimesh.load(obj_nm, process=False)
-            obj_verts = np.array(obj_mesh.vertices)
-            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-            obj_faces = np.array(obj_mesh.faces)
-            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
-        return self.id2meshdata[obj_id]
-
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
-    def __getitem__(self, index):
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        i_c = 0
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
-
-        object_id = c[3][-1]
-        object_name = self.id2objmeshname[object_id]
-        
-        # start_idx = index * self.step_size
-        # if start_idx + self.window_size > self.len:
-        #     start_idx = self.len - self.window_size
-        
-        start_idx = self.start_idx
-            
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        
-        data = c[2][start_idx:start_idx+self.window_size]
-        # # object_global_orient = self.data[index]['f5']
-        # # object_transl = self.data[index]['f6'] #
-        # object_global_orient = data['f5'] ### get object global orientations ###
-        # object_trcansl = data['f6']
-        # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        object_global_orient = c[3][-3] # num_frames x 3 
-        object_transl = c[3][-2] # num_frames x 3
-        
-        
-        # object_global_orient, object_transl #
-        object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        object_transl = object_transl[start_idx: start_idx + self.window_size]
-        object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        object_trcansl_th = torch.from_numpy(object_transl).float()
-        
-        # pert_subj_params = c[4]
-        
-        st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx
-        
-        ### pts gt ###
-        ## rhnad pose, rhand pose gt ##
-        ## glboal orientation and hand pose #
-        rhand_global_orient_gt, rhand_pose_gt = c[3][3], c[3][4]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-        rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-        print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-        rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-        
-        rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-        rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-        
-        rhand_transl, rhand_betas = c[3][5], c[3][6]
-        rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas
-        
-        # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-        rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-        rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
-        
-        # # orientation rotation matrix #
-        # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
-        # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
-        # # orientation rotation matrix #
-        
-        rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
-        rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
-        rhand_beta_var = torch.from_numpy(rhand_betas).float()
-        rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
-        # R.from_rotvec(obj_rot).as_matrix()
-        
-        ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
-        #### ==== get random augmented pose, rot, transl ==== ####
-        # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
-        # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
-        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # ### === get and save noise vectors === ###
-        # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
-        aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
-        aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
-        aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
-        # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
-        # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
-        # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
-        # ### creat augmneted orientations, pose, and transl ###
-        rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
-        rnd_aug_pose_var = rhand_pose_var + aug_pose_var
-        rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
-        
-        
-        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_betas_var, rhand_beta_var
-        rhand_verts, rhand_joints = self.mano_layer(
-            torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
-        )
-        ### rhand_joints: for joints ###
-        rhand_verts = rhand_verts * 0.001
-        rhand_joints = rhand_joints * 0.001
-        
-        
-        # ### pert_rhand_global_orient_var, pert_rhand_pose_var, pert_rhand_transl_var ###
-        if self.use_rnd_aug_hand: ## rnd aug pose var, transl var #
-            # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-            pert_rhand_global_orient_var = rnd_aug_global_orient_var.clone()
-            pert_rhand_pose_var = rnd_aug_pose_var.clone()
-            pert_rhand_transl_var = rnd_aug_transl_var.clone()
-            # pert_rhand_global_orient_mtx = utils.batched_get_orientation_matrices(pert_rhand_global_orient_var.numpy())
-        
-        # # pert_rhand_betas_var
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_joints --> for rhand joints in the camera frmae ###
-        pert_rhand_verts, pert_rhand_joints = self.mano_layer(
-            torch.cat([pert_rhand_global_orient_var, pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), pert_rhand_transl_var
-        )
-        pert_rhand_verts = pert_rhand_verts * 0.001 # verts 
-        pert_rhand_joints = pert_rhand_joints * 0.001 # joints
-
-
-        if self.wpredverts:
-            # print(f"ori_pert_rhand_verts: {pert_rhand_verts.s}")
-            pert_rhand_joints = self.predicted_hand_joints
-            rhand_joints = self.predicted_hand_joints
-
-            rhand_verts = self.predicted_hand_verts
-            pert_rhand_verts =  self.predicted_hand_verts
-            
-            pert_rhand_joints = torch.matmul(
-                pert_rhand_joints, object_global_orient_mtx_th
-            ) + object_trcansl_th.unsqueeze(1)
-
-            rhand_joints = torch.matmul(
-                rhand_joints, object_global_orient_mtx_th
-            ) + object_trcansl_th.unsqueeze(1)
-
-            rhand_verts = torch.matmul(
-                rhand_verts, object_global_orient_mtx_th
-            ) + object_trcansl_th.unsqueeze(1)
-
-            pert_rhand_verts = torch.matmul(
-                pert_rhand_verts, object_global_orient_mtx_th
-            ) + object_trcansl_th.unsqueeze(1)
-        
-        
-       
-        
-        # use_canon_joints
-        
-        canon_pert_rhand_verts, canon_pert_rhand_joints = self.mano_layer(
-            torch.cat([torch.zeros_like(pert_rhand_global_orient_var), pert_rhand_pose_var], dim=-1),
-            rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), torch.zeros_like(pert_rhand_transl_var)
-        )
-        canon_pert_rhand_verts = canon_pert_rhand_verts * 0.001 # verts 
-        canon_pert_rhand_joints = canon_pert_rhand_joints * 0.001 # joints
-        
-        
-        # ### Relative positions from base points to rhand joints ###
-        object_pc = data['f3'].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_normal = data['f4'].reshape(self.window_size, -1, 3).astype(np.float32)
-        object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
-        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
-        
-        
-        # base_pts_feats_sv_dict = {}
-        #### distance between rhand joints and obj pcs ####
-        # pert_rhand_joints_th = pert_rhand_joints
-        # ws x nnjoints x nnobjpts #
-        dist_rhand_joints_to_obj_pc = torch.sum(
-            (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        )
-        # dist_pert_rhand_joints_obj_pc = torch.sum(
-        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        # )
-        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
-        
-        object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
-        # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-        dist_object_pc_nearest_pcs = torch.sum(
-            (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1
-        )
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs
-        dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
-        # # dist_threshold = 0.01
-        dist_threshold = self.dist_threshold
-        # # dist_threshold for pc_nearest_pcs #
-        dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-        
-        # # base_pts_mask: nn_obj_pcs #
-        base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
-        # # nn_base_pts x 3 -> torch tensor #
-        base_pts = object_pc_th[0][base_pts_mask]
-        # # base_pts_bf_sampling = base_pts.clone()
-        base_normals = object_normal_th[0][base_pts_mask]
-        
-        nn_base_pts = self.nn_base_pts
-        base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
-        base_pts_idxes = base_pts_idxes[:nn_base_pts]
-        # if self.debug:
-        #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # ### get base points ### # base_pts and base_normals #
-        base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
-        base_normals = base_normals[base_pts_idxes]
-        
-        
-        # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        base_pts_transl = object_trcansl_th[0] # 3
-        
-        # if self.dir_stra == "rot_angles": ## rot angles ##
-        #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # if self.canon_obj:
-            ## reverse transform base points ###
-            ## canonicalize base points and base normals ###
-        base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-            ) # .transpose(0, 1)
-        base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-            ) # .transpose(0, 1)
-        
-        
-        rhand_joints = torch.matmul(
-            rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        pert_rhand_joints = torch.matmul(
-            pert_rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
-        )
-        
-        
-        if not self.wpredverts:
-            pert_rhand_joints = self.predicted_hand_joints
-        
-
-        # nf x nnj x nnb x 3 # 
-        rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        
-        # # dist_base_pts_to...: ws x nn_joints x nn_sampling # ### dit bae tps to rhand joints ###
-        dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        
-        # k of the # # nf x nnj x nnb # # nnj x nnb # nnb -> 
-        ## TODO: other choices of k_f? ##
-        k_f = 1.
-        # relative #
-        l2_rel_base_pts_to_rhand_joints = torch.norm(rel_base_pts_to_rhand_joints, dim=-1)
-        ### att_forces ##
-        att_forces = torch.exp(-k_f * l2_rel_base_pts_to_rhand_joints) # nf x nnj x nnb #
-        
-        att_forces = att_forces[:-1, :, :]
-        # rhand_joints: ws x nnj x 3 # -> (ws - 1) x nnj x 3 ## rhand_joints ##
-        
-        
-        rhand_joints_disp = pert_rhand_joints[1:, :, :] - pert_rhand_joints[:-1, :, :]
-        
-        # rhand_joints_disp = rhand_joints[1:, :, :] - rhand_joints[:-1, :, :]
-        # 
-        # distance -- base_normalss,; (ws - 1) x nnj x nnb x 3 -
-        signed_dist_base_pts_to_rhand_joints_along_normal = torch.sum(
-            base_normals.unsqueeze(0).unsqueeze(0) * rhand_joints_disp.unsqueeze(2), dim=-1
-        )
-        # nf x nnj x nnb x 3 --> rel_vt_normals ## nf x nnj x nnb
-        # # (ws - 1) x nnj x nnb # # (ws - 1) x nnj x 3 --> 
-        # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
-        rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals.unsqueeze(0).unsqueeze(0)
-        # nf x nnj x nnb ---> dist_vt_normals -> nf x nnj x nnb # # torch.sqrt() ##
-        dist_base_pts_to_rhand_joints_vt_normal = torch.sqrt(torch.sum(
-            rel_base_pts_to_rhand_joints_vt_normal ** 2, dim=-1
-        ))
-        
-        k_a = 1.
-        k_b = 1.
-        # k and # give me a noised sequence ... #
-        # (ws - 1) x nnj x nnb # --> (ws - 1) x nnj x nnb # nnj x nnb # 
-        # add noise -> chagne of the joints displacements 
-        # -> change of along_normalss energies and vertical to normals energies #
-        # -> change of energy taken to make the displacements #
-        # jts_to_base_pts energy in the noisy sequence #
-        # jts_to_base_pts energy in the clean sequence #
-        # vt-normal, along_normal #
-        # TODO: the normalization strategy: 1) per-instnace; 2) per-category; #3
-        # att_forces: (ws - 1) x nnj x nnb # # 
-        e_disp_rel_to_base_along_normals = k_a * att_forces * torch.abs(signed_dist_base_pts_to_rhand_joints_along_normal)
-        # (ws - 1) x nnj x nnb # -> dist vt normals #
-        e_disp_rel_to_baes_vt_normals = k_b * att_forces * dist_base_pts_to_rhand_joints_vt_normal
-        # base_pts; base_normals; 
-        
-        
-        ''' normalization sstrategy 1 ''' # 
-        # per_frame_avg_disp_along_normals, per_frame_std_disp_along_normals # 
-        # per_frame_avg_disp_vt_normals, per_frame_std_disp_vt_normals #
-        # e_disp_rel_to_base_along_normals, e_disp_rel_to_baes_vt_normals #
-        # per_frame_avg_disp_along_normalss, per_frame_std_disp_along_normalss # 
-        # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
-        disp_ws, nnj, nnb = e_disp_rel_to_base_along_normals.shape[:3]
-        # disp_ws x nnf x nnb x 3 #  -> disp_ws x nnj x nnb
-        per_frame_avg_disp_along_normals = torch.mean( # avg over all frmaes #
-            e_disp_rel_to_base_along_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True # for each point #
-        ) # .unsqueeze(0)
-        per_frame_std_disp_along_normals = torch.std( # std over all frames #
-            e_disp_rel_to_base_along_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
-        ) # .unsqueeze(0)
-        per_frame_avg_disp_vt_normals = torch.mean( # avg over all frmaes #
-            e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True # for each point #
-        ) # .unsqueeze(0)
-        per_frame_std_disp_vt_normals = torch.std( # std over all frames #
-            e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
-        ) # .unsqueeze(0)
-        # per_frame_avg_joints_dists_rel = torch.mean(
-        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-        # ).unsqueeze(0)
-        # per_frame_std_joints_dists_rel = torch.std(
-        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-        # ).unsqueeze(0)
-        ### normalizaed aong normals and vat normals  # ws x nnj x nnb 
-        e_disp_rel_to_base_along_normals = (e_disp_rel_to_base_along_normals - per_frame_avg_disp_along_normals) / per_frame_std_disp_along_normals
-        e_disp_rel_to_baes_vt_normals = (e_disp_rel_to_baes_vt_normals - per_frame_avg_disp_vt_normals) / per_frame_std_disp_vt_normals
-        # enrgy temrs #
-        ''' normalization sstrategy 1 ''' # 
-        
-        
-        
-        
-        
-        if self.denoising_stra == "rep":
-            ''' Relative positions and distances normalization, strategy 3 '''
-            # # for each point normalize joints over all frames #
-            # # rel_base_pts_to_rhand_joints: nf x nnj x nnb x 3 #
-            per_frame_avg_joints_rel = torch.mean(
-                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_std_joints_rel = torch.std(
-                rel_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_avg_joints_dists_rel = torch.mean(
-                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            per_frame_std_joints_dists_rel = torch.std(
-                dist_base_pts_to_rhand_joints, dim=0, keepdim=True
-            )
-            # max xyz vlaues for the relative positions, maximum, minimum distances for them #
-            
-            
-            # # nf x nnj x nnb x 3 # 
-            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-            # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-            dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-            
-            rel_base_pts_to_rhand_joints = (rel_base_pts_to_rhand_joints - per_frame_avg_joints_rel) / per_frame_std_joints_rel
-            dist_base_pts_to_rhand_joints = (dist_base_pts_to_rhand_joints - per_frame_avg_joints_dists_rel) / per_frame_std_joints_dists_rel
-            stats_dict = {
-                'per_frame_avg_joints_rel': per_frame_avg_joints_rel,
-                'per_frame_std_joints_rel': per_frame_std_joints_rel,
-                'per_frame_avg_joints_dists_rel': per_frame_avg_joints_dists_rel,
-                'per_frame_std_joints_dists_rel': per_frame_std_joints_dists_rel,
-            }
-            ''' Relative positions and distances normalization, strategy 3 '''
-        
-        if self.denoising_stra == "motion_to_rep": # motion_to_rep #
-            pert_rhand_joints = (pert_rhand_joints - self.avg_jts) / self.std_jts
-        
-        
-        ''' Relative positions and distances normalization, strategy 4 '''
-        # rel_base_pts_to_rhand_joints = rel_base_pts_to_rhand_joints / (self.maxx_rel - self.minn_rel).unsqueeze(0).unsqueeze(0).unsqueeze(0)
-        # dist_base_pts_to_rhand_joints = dist_base_pts_to_rhand_joints / (self.maxx_dists - self.minn_dists).unsqueeze(0).unsqueeze(0).unsqueeze(0).squeeze(-1)
-        ''' Relative positions and distances normalization, strategy 4 '''
-        
-        # 
-        # rt_pert_rhand_verts =  pert_rhand_verts
-        # rt_rhand_verts = rhand_verts
-        # rt_pert_rhand_joints = pert_rhand_joints
-        
-        # rt_rhand_joints = rhand_joints ## rhand_joints ##
-        # # rt_rhand_joints = pert_rhand_joints
-        
-        
-        # # rt_rhand_joints: nf x nnjts x 3 # ### pertrhandjoints
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1s
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-        
-        ''' Obj data '''
-        obj_verts, obj_normals, obj_faces = self.get_idx_to_mesh_data(object_id)
-        obj_verts = torch.from_numpy(obj_verts).float() # nn_verts x 3 #
-        obj_normals = torch.from_numpy(obj_normals).float() # 
-        obj_faces = torch.from_numpy(obj_faces).long() # nn_faces x 3 ## -> triangels indexes ##
-        ''' Obj data '''
-        
-        # rt_rhand_joints: nf x nnjts x 3 #
-        # exp_hand_joints = rt_rhand_joints.view(rt_rhand_joints.size(0) * rt_rhand_joints.size(1), 3).contiguous()
-        # avg_joints = torch.mean(exp_hand_joints, dim=0, keepdim=True) # 1 x 3
-        # # avg_joints = torch.mean(avg_joints, dim=)
-        # std_joints = torch.std(exp_hand_joints.view(-1), dim=0, keepdim=True) # 1
-        # if self.inst_normalization:
-        #     if self.args.debug:
-        #         print(f"normalizing joints using mean: {avg_joints}, std: {std_joints}")
-        #     rt_rhand_joints = (rt_rhand_joints - avg_joints.unsqueeze(0)) / std_joints.unsqueeze(0).unsqueeze(0)
-            
-        # word_embeddings = np.concatenate(word_embeddings, axis=0)
-        caption = "apple"
-        # pose_one_hots, word_embeddings #
-        
-        # object_global_orient_th, object_transl_th #
-        object_global_orient_th = torch.from_numpy(object_global_orient).float()
-        object_transl_th = torch.from_numpy(object_transl).float()
-        
-        ''' Construct data for returning '''
-        rt_dict = {
-            'base_pts': base_pts, # th
-            'base_normals': base_normals, # th
-            'rel_base_pts_to_rhand_joints': rel_base_pts_to_rhand_joints, # th, ws x nnj x nnb x 3 
-            'dist_base_pts_to_rhand_joints': dist_base_pts_to_rhand_joints, # th, ws x nnj x nnb
-            # 'rhand_joints': rhand_joints,
-            'gt_rhand_joints': rhand_joints, ## rhand joints ###
-            'rhand_joints': pert_rhand_joints if not self.args.use_canon_joints else canon_pert_rhand_joints,
-            'rhand_verts': rhand_verts,
-            # 'word_embeddings': word_embeddings,
-            # 'pos_one_hots': pos_one_hots,
-            'caption': caption,
-            # 'sent_len': sent_len,
-            # 'm_length': m_length,
-            # 'text': '_'.join(tokens),
-            'object_id': object_id, # int value
-            'lengths': rel_base_pts_to_rhand_joints.size(0),
-            'object_global_orient': object_global_orient_th,
-            'object_transl': object_transl_th,
-            # 'st_idx': st_idx,
-            # 'ed_idx': ed_idx,
-            'st_idx': 0,
-            'ed_idx': 0 + self.window_size,
-            'pert_verts': pert_rhand_verts,
-            'verts': rhand_verts,
-            'obj_verts': obj_verts,
-            'obj_normals': obj_normals, # normals? 
-            'obj_faces': obj_faces, # nnfaces x 3 #
-             'obj_rot': object_global_orient_mtx_th, # ws x 3 x 3 --> 
-            'obj_transl': object_trcansl_th, # ws x 3 --> obj transl 
-            ## sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns ##
-            # 'sampled_base_pts_nearest_obj_pc': sampled_base_pts_nearest_obj_pc, 
-            # 'sampled_base_pts_nearest_obj_vns': sampled_base_pts_nearest_obj_vns,
-            'per_frame_avg_disp_along_normals': per_frame_avg_disp_along_normals,
-            'per_frame_std_disp_along_normals': per_frame_std_disp_along_normals,
-            'per_frame_avg_disp_vt_normals': per_frame_avg_disp_vt_normals,
-            'per_frame_std_disp_vt_normals': per_frame_std_disp_vt_normals,
-            'e_disp_rel_to_base_along_normals': e_disp_rel_to_base_along_normals,
-            'e_disp_rel_to_baes_vt_normals': e_disp_rel_to_baes_vt_normals, # 
-        }
-        try:
-            # rt_dict['per_frame_avg_joints_rel'] = 
-            rt_dict.update(stats_dict)
-        except:
-            pass
-        ''' Construct data for returning '''
-        
-        return rt_dict
-
-
-        if self.dir_stra == 'rot_angles':
-            # tangent_orient_vec # nn_base_pts x 3 #
-            rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
-        
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
-
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
-
-    def __len__(self):
-        cur_len = self.len // self.step_size
-        if cur_len * self.step_size < self.len:
-          cur_len += 1
-        cur_len = 1
-        return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len

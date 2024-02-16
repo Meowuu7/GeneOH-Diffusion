@@ -58,6 +58,8 @@ Download model from [here](https://drive.google.com/file/d/1Uv030DkxRE8VgjlMnXhw
 
 ### 3. Get data 
 
+- Download GRAB object meshes from [here](https://drive.google.com/file/d/19uvDxyHR9-kFi6wsU-7XFI5HoJu7MaZE/view?usp=sharing) and unzip the obtained `object_meshes.zip` under the folder `./data/grab`.
+- 
 
 We include data samples from a recent [TACO dataset](https://taco2024.github.io/) in the folder `./data/taco/source_data` for test. More data is coming. 
 
@@ -65,6 +67,39 @@ We include data samples from a recent [TACO dataset](https://taco2024.github.io/
 
 
 ## Example Usage
+
+### GRAB example
+
+Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The input sequence and two different samples are shown as below. 
+
+
+|        Input        |       Result 1         |         Result 2         |
+| :----------------------: | :---------------------: | :-----------------------: |
+| ![](assets/grab-14-input.gif) | ![](assets/grab-14-res.gif) | ![](assets/grab-14-res-2.gif) |
+
+
+Follow steps below to reproduce the above result. 
+
+1. **Denoising**
+   ```bash
+   bash scripts/val_examples/predict_grab_rndseed_14.sh
+   #### After completing the above command ####
+   bash scripts/val_examples/predict_grab_rndseed_spatial_14.sh
+   ```
+   Ten random seeds will be utilizd for prediction. The predicted results will be saved in the folder `./data/grab/result`. 
+2. **Mesh reconstruction**
+   ```bash
+   bash scripts/val_examples/reconstruct_grab_14.sh
+   ```
+   Results will be saved under the same folder with the above step. 
+3. **Extracting results and visualization** 
+   ```bash
+   python visualize/vis_grab_example_14.py
+   ```
+   Adjust camera pose in the viewer given the first frame. Then figures capturing all frames will be saved under the root folder of the project. Use your favorate tool to compose them together into a video. 
+   
+
+
 
 
 
@@ -92,10 +127,13 @@ Follow steps below to reproduce the above result.
    Results will be saved under the same folder with the above step. 
 3. **Extracting results and visualization** 
    ```bash
-   python visualize/vis_polyscope.py
+   python visualize/vis_taco_example_20231104_017.py
    ```
    Adjust camera pose in the viewer given the first frame. Then figures capturing all frames will be saved under the root folder of the project. Use your favorate tool to compose them together into a video. 
    
+
+
+
 
 ## TODOs
 
