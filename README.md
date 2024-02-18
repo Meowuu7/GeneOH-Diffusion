@@ -42,7 +42,7 @@ Install remaining dependencies
 pip install -r requirements.txt --no-cache
 ```
 
-(**Important**) Install `manopth`
+**Important**: Install `manopth`
 
 ```shell
 cd manopth
@@ -52,23 +52,32 @@ cd ..
 
 **Note that the MANO layer we use is slightly different from the original official release. The `manopth` package should be install from this project otherwise the model would produce wierd denoised results**
 
-### 2. Download pre-trained model
+### 2. Download pre-trained models
 
-Download model from [here](https://drive.google.com/file/d/1Uv030DkxRE8VgjlMnXhwmAk27L9dNM18/view?usp=drive_link) and put it under the `./ckpt` folder. 
+Download models from [here](https://drive.google.com/drive/folders/1_0p2REWdisKx2sCAvHkOHsNFjZUwi87h?usp=sharing) and put them under the folder `./ckpts`. 
 
 ### 3. Get data 
 
-- Download GRAB object meshes from [here](https://drive.google.com/file/d/19uvDxyHR9-kFi6wsU-7XFI5HoJu7MaZE/view?usp=sharing) and unzip the obtained `object_meshes.zip` under the folder `./data/grab`.
-- 
+**1. GRAB**
 
+- Download [preprocessed data (object, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgS4lAVZmVnhp4c-2?e=njx6oZ). Extract them under a data folder for GRAB preprocessed object data (*e.g.* `./data/grab/GRAB_processed`). 
+- Download [GRAB object meshes](https://drive.google.com/file/d/19uvDxyHR9-kFi6wsU-7XFI5HoJu7MaZE/view?usp=sharing) and unzip the obtained `object_meshes.zip` under the folder `./data/grab`.
+- Download [preprocessed data (hand, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgTCIWuIDnf3J9BuK?e=1HsJXu). Extract them under a data folder for GRAB preprocessed subject data (*e.g.* `./data/grab/GRAB_processed_wsubj`). 
+
+**2. TACO**
 We include data samples from a recent [TACO dataset](https://taco2024.github.io/) in the folder `./data/taco/source_data` for test. More data is coming. 
 
 
 
 
-## Example Usage
+## Usage
 
-### GRAB example
+### GRAB
+
+
+**Example**
+
+> An example of cleaning an input trajectory (sequence 14 of GRAB's test split) with Gaussian noise.
 
 Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The input sequence and two different samples are shown as below. 
 
@@ -97,13 +106,77 @@ Follow steps below to reproduce the above result.
    python visualize/vis_grab_example_14.py
    ```
    Adjust camera pose in the viewer given the first frame. Then figures capturing all frames will be saved under the root folder of the project. Use your favorate tool to compose them together into a video. 
-   
+
+**Evaluate on the test split** 
+
+1. **Update data and experimental paths in `.sh` scripts**
+   - For GRAB testing scripts, including [`scripts/val/predict_grab_rndseed.sh`](./scripts/val/predict_grab_rndseed.sh), xxx, xxx, edit data and experimental path related arguments specified in those scripts to your corresponding paths where donwloaded data are saved. For instance, 
+   ```bash
+      ################# [Edit here] Set to your paths #################
+      #### Data and exp folders ####
+      export seq_root="data/grab/GRAB_processed/test"
+      export grab_path="data/grab/GRAB_extracted"
+      export save_dir="exp/grab/eval_save"
+      export grab_processed_dir="data/grab/GRAB_processed"
+   ```
+2. **Denoising**
+   ```bash
+   bash scripts/val/predict_grab_rndseed.sh
+   #### After completing the above command ####
+   bash scripts/val/predict_grab_rndseed_spatial.sh
+   ```
+3. **Mesh reconstruction**
+   Script [`scripts/val/reconstruct_grab.sh`](./scripts/val/reconstruct_grab.sh) can reconstruct a single sequence, which is what the argument `single_seq_path` points to. Set the `single_seq_path` and the test tag in the script and run it:
+   ```bash
+   bash scripts/val/reconstruct_grab.sh
+   ```
+
+**Denoising a full sequence**
+
+
+
+full evals
+- preprocessed data 
+- reconstruction pipelines
+- full sequence processing file
+- full sequence processing pipeline
 
 
 
 
 
-### TACO example
+### GRAB (Beta)
+
+
+**Example**
+
+> An example of cleaning an input trajectory (sequence 14 of GRAB's test split) with noise sampled from a Beta distribution.
+
+Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The input sequence and two different samples are shown as below. 
+
+
+|        Input        |       Result 1         |         Result 2         |
+| :----------------------: | :---------------------: | :-----------------------: |
+| ![](assets/grab-14-input-beta.gif) | ![](assets/grab-14-res-1-beta.gif) | ![](assets/grab-14-res-2-beta.gif) |
+
+
+Use scripts in `scripts/val_examples` for the GRAB example outlined in the previous section but changing the `pert_type` argument in each `.sh` file from `gaussian` to `beta` to reproduce the results. 
+
+
+
+**Evaluate on the test split** 
+
+
+To run th evaluation process on all GRAB test sequences, follow the same steps as outlined in the previous section but change the `pert_type` argument in each `.sh` file from `gaussian` to `beta`. 
+
+
+
+
+
+
+
+
+### TACO
 
 Use the model to clean the noisy trajectory `data/taco/source_data/20231104_017.pkl`. Input, result, and the overlayed video are shown as below.
 
@@ -137,8 +210,8 @@ Follow steps below to reproduce the above result.
 
 ## TODOs
 
-- [ ] TOCH, TOCH (Beta), HOI4D, TACO
-- [ ] Training pipeline
+- [ ] HOI4D, TACO
+- [ ] Training pipelines
 
 
 ## Bibtex

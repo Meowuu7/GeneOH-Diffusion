@@ -20,9 +20,6 @@ import trimesh
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
-## TODO: 1) how the current prediction process functions? 
-##       2) sampling based prediction?
-
 def get_args():
     args = Namespace()
     args.fps = 20
@@ -110,17 +107,7 @@ def get_base_pts_rhand_joints_from_data(data):
 
 import time
 
-def get_resplit_test_idxes():
-    test_split_mesh_nm_to_seq_idxes = "/home/xueyi/sim/motion-diffusion-model/test_mesh_nm_to_test_seqs.npy"
-    test_split_mesh_nm_to_seq_idxes = np.load(test_split_mesh_nm_to_seq_idxes, allow_pickle=True).item()
-    tot_test_seq_idxes = []
-    for tst_nm in test_split_mesh_nm_to_seq_idxes:
-        tot_test_seq_idxes = tot_test_seq_idxes + test_split_mesh_nm_to_seq_idxes[tst_nm]
-    return tot_test_seq_idxes
 
-    
-# CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.predict_ours --model_path ${model_path}  --input_text ./assets/example_pro.txt --dataset motion_ours --save_dir ${save_dir}
-# python -m train.train_mdm --save_dir save/my_humanml_trans_enc_512 --dataset motion_ours
 def main():
   
     args = train_args()
@@ -134,10 +121,6 @@ def main():
     ### and also add the arg -> prev test tag ###
     save_dir = args.save_dir
     
-    
-    
-    # os.makedirs(save_dir, exist_ok=True)
-    
 
     dist_util.setup_dist(args.device)
     
@@ -148,7 +131,7 @@ def main():
     os.makedirs(args.save_dir, exist_ok=True)
     train_platform_type = eval(args.train_platform_type)
     train_platform = train_platform_type(args.save_dir)
-    train_platform.report_args(args, name='Args') # train platform
+    train_platform.report_args(args, name='Args')
     
     
     
@@ -159,11 +142,8 @@ def main():
     print(f"save_dir: {save_dir}, single_seq_path: {single_seq_path}")
     
     for cur_seed in range(0, 122, 11):
-    # for test_seq_idx in tot_test_seq_idxes:
-    # try:
-    # for test_seq_idx in tot_test_seq_idxes:
-
-        # cur_single_seq_path = os.path.join(seq_root, f"{test_seq_idx}.npy")
+        
+        
         cur_single_seq_path = single_seq_path
         args.single_seq_path = cur_single_seq_path
         print(f"cur_single_seq_path: {cur_single_seq_path}")
@@ -209,8 +189,9 @@ def main():
         tot_base_pts,  tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl = get_base_pts_rhand_joints_from_data(data)
         
         
-        grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        # grab_path = args.grab_path
+        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
         for i, fn in enumerate(obj_meshes):
@@ -221,22 +202,12 @@ def main():
         obj_verts = np.array(obj_mesh.vertices)
         obj_vertex_normals = np.array(obj_mesh.vertex_normals)
         obj_faces = np.array(obj_mesh.faces)
-        # runloop
-        ## load model and sample / predict denoised data via the model from noisy inputs ##
-        
-        
-        ## predict_from_data
+
         print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters_wo_clip()) / 1000000.0))
         print("Training...")
-        # TrainLoop(args, train_platform, model, diffusion, data).run_loop()
-        # predict_from_data
-        
-        ## TODO: should return used objects as well ##
-        ## ==== predict from data ==== ##
-        # TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-        
+
+
         if args.diff_basejtse:
-            # tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals #
             tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts, tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
         else:
             tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
@@ -254,7 +225,7 @@ def main():
         full_outputs = []
         full_pert_verts = []
         full_verts = []
-        full_obj_verts = [] # nn_frames x nn_obj_verts x 3 here ! #
+        full_obj_verts = []
         
         
         full_dec_disp_e_along_normals = []
@@ -291,12 +262,8 @@ def main():
                 # ### cur_ins_obj_rot_mtx, cur_ins_obj_transl ### #
                 cur_ins_obj_rot_mtx = R.from_rotvec(cur_ins_obj_orient).as_matrix() # 3 x 3
                 cur_ins_obj_transl = cur_ins_obj_transl.reshape(1, 3)
-                # obj_verts: nn_obj_verts x 3 #
 
-                # transformed_obj_verts = np.matmul(
-                #     obj_verts, cur_ins_obj_rot_mtx
-                # ) + cur_ins_obj_transl
-                
+
                 transformed_obj_verts = obj_verts
                 full_obj_verts.append(transformed_obj_verts) ## obj_verts ##
                 
@@ -306,19 +273,11 @@ def main():
                         full_dec_disp_e_vt_normals.append(cur_dec_disp_e_vt_normals[cur_ins_rel_idx].detach().cpu().numpy())
                     except:
                         pass
-                # /data1/xueyi/mdm/save/trans_enc_512_rel_basejtsrelonly_lbsz_sep_model_use_sigmoid_train_enc_nusevae_dec_rel_v2_predavgjts_/model000001500.pt... 
                 full_targets.append(cur_ins_targets.detach().cpu().numpy())
                 full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
                 full_pert_verts.append(cur_ins_pert_verts.detach().cpu().numpy())
                 full_verts.append(cur_ins_verts.detach().cpu().numpy())
                 
-            # for i_ins in range(cur_targets.shape[-1]):
-            #     cur_ins_rel_idx = i_ins
-            #     cur_ins_targets = cur_targets[..., cur_ins_rel_idx]
-            #     cur_ins_outputs = cur_outputs[..., cur_ins_rel_idx]
-            #     full_targets.append(cur_ins_targets.detach().cpu().numpy())
-            #     full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
-        ## full targets ##
         full_targets = np.stack(full_targets, axis=0)
         full_outputs = np.stack(full_outputs, axis=0)
         full_pert_verts = np.stack(full_pert_verts, axis=0)
@@ -329,26 +288,25 @@ def main():
             full_dec_disp_e_along_normals = np.stack(full_dec_disp_e_along_normals, axis=0)
             full_dec_disp_e_vt_normals = np.stack(full_dec_disp_e_vt_normals, axis=0)
         
-        # and just use 
-        # penetration resolving # extract predictions? #
+        
         sv_dict = {
-            'targets': full_targets, ## p
-            'outputs': full_outputs, ### joutput joints 
+            'targets': full_targets,
+            'outputs': full_outputs,
             'pert_verts': full_pert_verts,
             'verts': full_verts,
-            'obj_verts': full_obj_verts, ### full_obj_verts; obj_faces ###
+            'obj_verts': full_obj_verts,
             'obj_faces': obj_faces,
-            'tot_base_pts': tot_base_pts.numpy() / data_scale_factor, ## total base pts ##
+            'tot_base_pts': tot_base_pts.numpy() / data_scale_factor,
             'tot_rhand_joints': tot_rhand_joints.numpy() / data_scale_factor,
             'tot_base_normals': tot_base_normals.numpy(), 
             'tot_gt_rhand_joints': tot_gt_rhand_joints.numpy() / data_scale_factor,
-            'tot_obj_rot': tot_obj_rot.numpy(),  # ws x 3 x 3 #
-            'tot_obj_transl': tot_obj_transl.numpy(), # ws x 3 
+            'tot_obj_rot': tot_obj_rot.numpy(), 
+            'tot_obj_transl': tot_obj_transl.numpy(),
             'single_obj_normals': obj_vertex_normals,
         }
         
-        # seq_idx = int(args.single_seq_path.split("/")[-1].split(".")[0])
-        seq_idx = test_seq_idx # test seq idx #
+        
+        seq_idx = test_seq_idx
         if args.diff_basejtse:
             dec_e_dict = {
                 'dec_disp_e_along_normals': full_dec_disp_e_along_normals,

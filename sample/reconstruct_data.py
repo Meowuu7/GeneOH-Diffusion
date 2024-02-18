@@ -18,15 +18,8 @@ import trimesh
 from utils import *
 import utils
 import utils.model_util as model_util
-# from anchorutils import anchor_load_driver, recover_anchor, recover_anchor_batch
 
-# K x (1 + 1)
-# minimum distance; disp - k * disp_o(along_disp_dir)  (l2 norm); k * disp_o(vertical_disp_dir) (l2 norm) -> how those 
-# # object moving and the contact information ? #
-# only textures on the hand vertices # themselves # 
 
-## the effectiveness of those values themselves --> 
-# torch, not_batched #
 def calculate_disp_quants(joints, base_pts_trans, minn_base_pts_idxes=None):
   # joints: nf x nn_joints x 3; 
   # base_pts_trans: nf x nn_base_pts x 3; # base pts trans #
@@ -230,7 +223,7 @@ def get_optimized_hand_fr_joints(joints):
   joints = torch.from_numpy(joints).float().cuda()
   ### start optimization ###
   # setup MANO layer
-  mano_path = "/data1/sim/mano_models/mano/models"
+  mano_path = "manopth/mano/models"
   mano_layer = ManoLayer(
       flat_hand_mean=True,
       side='right',
@@ -352,7 +345,7 @@ def get_optimized_hand_fr_joints_v2(joints, base_pts):
   base_pts = torch.from_numpy(base_pts).float().cuda()
   ### start optimization ###
   # setup MANO layer
-  mano_path = "/data1/sim/mano_models/mano/models"
+  mano_path = "manopth/mano/models"
   mano_layer = ManoLayer(
       flat_hand_mean=True,
       side='right',
@@ -519,7 +512,7 @@ def get_optimized_hand_fr_joints_v3(joints, base_pts, tot_base_pts_trans):
   tot_base_pts_trans = torch.from_numpy(tot_base_pts_trans).float().cuda()
   ### start optimization ###
   # setup MANO layer
-  mano_path = "/data1/sim/mano_models/mano/models"
+  mano_path = "manopth/mano/models"
   mano_layer = ManoLayer(
       flat_hand_mean=True,
       side='right',
@@ -715,7 +708,7 @@ def get_optimized_hand_fr_joints_v4(joints, base_pts, tot_base_pts_trans, tot_ba
   tot_base_normals_trans = torch.from_numpy(tot_base_normals_trans).float().cuda()
   ### start optimization ###
   # setup MANO layer
-  mano_path = "/data1/sim/mano_models/mano/models"
+  mano_path = "manopth/mano/models"
   mano_layer = ManoLayer(
       flat_hand_mean=True,
       side='right',
@@ -1117,7 +1110,7 @@ def get_optimized_hand_fr_joints_v5(joints, tot_gt_rhand_joints, base_pts, tot_b
   # tot_base_pts_trans = torch.from_numpy(tot_base_pts_trans).float().cuda()
   ### start optimization ###
   # setup MANO layer
-  mano_path = "/data1/sim/mano_models/mano/models"
+  mano_path = "manopth/mano/models"
   mano_layer = ManoLayer(
       flat_hand_mean=True,
       side='right',

@@ -62,7 +62,7 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
   tot_base_normals_trans = torch.from_numpy(tot_base_normals_trans).float().cuda()
   ### start optimization ###
   # setup MANO layer
-  mano_path = "/data1/xueyi/mano_models/mano/models"
+  mano_path = "manopth/mano/models"
   nn_hand_params = 24
   use_pca = True
   if not use_left:

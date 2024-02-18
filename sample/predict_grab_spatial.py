@@ -20,8 +20,6 @@ import trimesh
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
-## TODO: 1) how the current prediction process functions? 
-##       2) sampling based prediction?
 
 def get_args():
     args = Namespace()
@@ -108,19 +106,8 @@ def get_base_pts_rhand_joints_from_data(data):
     return tot_base_pts, tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl
 
 
-import time
 
-def get_resplit_test_idxes():
-    test_split_mesh_nm_to_seq_idxes = "/home/xueyi/sim/motion-diffusion-model/test_mesh_nm_to_test_seqs.npy"
-    test_split_mesh_nm_to_seq_idxes = np.load(test_split_mesh_nm_to_seq_idxes, allow_pickle=True).item()
-    tot_test_seq_idxes = []
-    for tst_nm in test_split_mesh_nm_to_seq_idxes:
-        tot_test_seq_idxes = tot_test_seq_idxes + test_split_mesh_nm_to_seq_idxes[tst_nm]
-    return tot_test_seq_idxes
 
-    
-# CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.predict_ours --model_path ${model_path}  --input_text ./assets/example_pro.txt --dataset motion_ours --save_dir ${save_dir}
-# python -m train.train_mdm --save_dir save/my_humanml_trans_enc_512 --dataset motion_ours
 def main():
   
     args = train_args()
@@ -160,10 +147,6 @@ def main():
         json.dump(vars(args), fw, indent=4, sort_keys=False)
     
     for cur_seed in range(0, 122, 11):
-    # for test_seq_idx in tot_test_seq_idxes:
-    # try:
-    # for test_seq_idx in tot_test_seq_idxes:
-
         cur_single_seq_path = single_seq_path # os.path.join(seq_root, f"{test_seq_idx}.npy")
         args.single_seq_path = cur_single_seq_path
         print(f"cur_single_seq_path: {cur_single_seq_path}")
@@ -209,8 +192,9 @@ def main():
         tot_base_pts,  tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl = get_base_pts_rhand_joints_from_data(data)
         
         
-        grab_path = "/data1/xueyi/GRAB_extracted"
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        # grab_path = args.grab_path
+        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
         for i, fn in enumerate(obj_meshes):
@@ -227,14 +211,7 @@ def main():
         
         ## predict_from_data
         print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters_wo_clip()) / 1000000.0))
-        print("Training...")
-        # TrainLoop(args, train_platform, model, diffusion, data).run_loop()
-        # predict_from_data
-        
-        ## TODO: should return used objects as well ##
-        ## ==== predict from data ==== ##
-        # TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-        
+
         if args.diff_basejtse:
             # tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals #
             tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts, tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
@@ -306,7 +283,6 @@ def main():
                         full_dec_disp_e_vt_normals.append(cur_dec_disp_e_vt_normals[cur_ins_rel_idx].detach().cpu().numpy())
                     except:
                         pass
-                # /data1/xueyi/mdm/save/trans_enc_512_rel_basejtsrelonly_lbsz_sep_model_use_sigmoid_train_enc_nusevae_dec_rel_v2_predavgjts_/model000001500.pt... 
                 full_targets.append(cur_ins_targets.detach().cpu().numpy())
                 full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
                 full_pert_verts.append(cur_ins_pert_verts.detach().cpu().numpy())

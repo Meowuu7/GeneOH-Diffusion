@@ -110,6 +110,7 @@ def get_dataset(name, num_frames, split='train', hml_mode='train', args=None):
         w_vectorizer = None
         # split = "val" ## add split, split here --> split --> split and split ##
         # data_path = "/data1/xueyi/GRAB_processed"
+        # grab_processed_dir 
         data_path = args.grab_processed_dir
         # split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None
         window_size = args.window_size

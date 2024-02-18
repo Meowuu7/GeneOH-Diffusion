@@ -26,5 +26,5 @@ def get_sh_from_json(json_file):
     
 
 if __name__=='__main__':
-    json_file = "/home/xueyi/sim/GeneOH-Diffusion/data/grab/result/args.json"
+    json_file = "/home/xueyi/sim/GeneOH-Diffusion/data/grab/result/args_spatial.json"
     get_sh_from_json(json_file=json_file)

@@ -20,8 +20,6 @@ import trimesh
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
-## TODO: 1) how the current prediction process functions? 
-##       2) sampling based prediction?
 
 def get_args():
     args = Namespace()
@@ -108,33 +106,10 @@ def get_base_pts_rhand_joints_from_data(data):
     return tot_base_pts, tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl
 
 
-import time
-
-def get_resplit_test_idxes():
-    test_split_mesh_nm_to_seq_idxes = "/home/xueyi/sim/motion-diffusion-model/test_mesh_nm_to_test_seqs.npy"
-    test_split_mesh_nm_to_seq_idxes = np.load(test_split_mesh_nm_to_seq_idxes, allow_pickle=True).item()
-    tot_test_seq_idxes = []
-    for tst_nm in test_split_mesh_nm_to_seq_idxes:
-        tot_test_seq_idxes = tot_test_seq_idxes + test_split_mesh_nm_to_seq_idxes[tst_nm]
-    return tot_test_seq_idxes
-
-    
-# CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.predict_ours --model_path ${model_path}  --input_text ./assets/example_pro.txt --dataset motion_ours --save_dir ${save_dir}
-# python -m train.train_mdm --save_dir save/my_humanml_trans_enc_512 --dataset motion_ours
 def main():
   
     args = train_args()
-    # cur_args = get_args()
-    # args.model_path = "/home/xueyi/sim/motion-diffusion-model/save/my_humanml_trans_enc_512/model000050000.pt" # model_path
-    # args.model_path = "/home/xueyi/sim/motion-diffusion-model/save/my_humanml_trans_enc_512_v2_w_60_bsz_64_unconstrainted_inst_norm_svi_500_/model000002500.pt"
-    # args.input_text = "./assets/example_pro.txt"
-    # args.input_text = ""
-    
-    # args.save_dir = "/data2/xueyi/eval_save/HOI_Arti/Scissors"
-    # predicted_infos_seq_44_seed_99_tag_jts_hoi4d_arti_t_400_.npy # for the predicted info seq ##
-    # args.test_tag
-    # /home/xueyi/sim/motion-diffusion-model/sample/predict_ours_objbase_bundle_ours_rndseed_grab.py
-    
+
     fixseed(args.seed)
     
 
@@ -142,17 +117,11 @@ def main():
     
 
     # tot_test_seq_idxes = range(0, 205, 1)
-    tot_test_seq_idxes = range(1, 205, 1)
-    # tot_test_seq_idxes = range(5, 6, 1)
+    tot_test_seq_idxes = range(15, 205, 1)
+    # tot_test_seq_idxes = range(15, 16, 1)
 
-    seq_root = "/data1/xueyi/GRAB_processed/test"
+    seq_root = args.seq_root
 
-    if args.resplit:
-        tot_test_seq_idxes = get_resplit_test_idxes()
-        seq_root = "/data1/xueyi/GRAB_processed/train"
-
-
-    args.save_dir = "/data2/xueyi/eval_save/GRAB"
     args.start_idx = 0
     
     
@@ -161,19 +130,18 @@ def main():
     os.makedirs(args.save_dir, exist_ok=True)
     train_platform_type = eval(args.train_platform_type)
     train_platform = train_platform_type(args.save_dir)
-    train_platform.report_args(args, name='Args') # train platform
+    train_platform.report_args(args, name='Args')
     
     
-    
-    args_path = os.path.join(args.save_dir, 'args.json')
+    args_sv_folder = "data/grab/result"
+    args_path = os.path.join(args_sv_folder, 'args.json')
+    print(f"args saved to {args_path}")
     with open(args_path, 'w') as fw:
-        json.dump(vars(args), fw, indent=4, sort_keys=True)
+        json.dump(vars(args), fw, indent=4, sort_keys=False)
     
     for cur_seed in range(0, 122, 11):
-    # for test_seq_idx in tot_test_seq_idxes:
-        try:
-            for test_seq_idx in tot_test_seq_idxes:
-
+        for test_seq_idx in tot_test_seq_idxes:
+            try:
                 cur_single_seq_path = os.path.join(seq_root, f"{test_seq_idx}.npy")
                 args.single_seq_path = cur_single_seq_path
                 print(f"cur_single_seq_path: {cur_single_seq_path}")
@@ -207,9 +175,9 @@ def main():
                     state_dict = torch.load(args.model_path, map_location='cpu')
                     load_model_wo_clip(model, state_dict) ## load model wihtout clip #
                 
-                model.to(dist_util.dev()) ## model-to-the-target-device ##
-                # model.rot2xyz.smpl_model.eval()
-                model.eval() ## ddp_model = model
+                model.to(dist_util.dev())
+                
+                model.eval()
                 try:
                     model.set_bn_to_eval()
                 except:
@@ -219,8 +187,9 @@ def main():
                 tot_base_pts,  tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl = get_base_pts_rhand_joints_from_data(data)
                 
                 
-                grab_path = "/data1/xueyi/GRAB_extracted"
-                obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+                # grab_path = args.grab_path
+                # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+                obj_mesh_path = "data/grab/object_meshes"
                 id2objmesh = []
                 obj_meshes = sorted(os.listdir(obj_mesh_path))
                 for i, fn in enumerate(obj_meshes):
@@ -231,32 +200,20 @@ def main():
                 obj_verts = np.array(obj_mesh.vertices)
                 obj_vertex_normals = np.array(obj_mesh.vertex_normals)
                 obj_faces = np.array(obj_mesh.faces)
-                # runloop
-                ## load model and sample / predict denoised data via the model from noisy inputs ##
-                
-                
-                ## predict_from_data
+
+
                 print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters_wo_clip()) / 1000000.0))
-                print("Training...")
-                # TrainLoop(args, train_platform, model, diffusion, data).run_loop()
-                # predict_from_data
                 
-                ## TODO: should return used objects as well ##
-                ## ==== predict from data ==== ##
-                # TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
                 
-                if args.diff_basejtse:
-                    # tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals #
-                    tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts, tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-                else:
-                    tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-                    tot_dec_disp_e_along_normals = None
-                    tot_dec_disp_e_vt_normals = None
+                ###### Denoising ######
+                tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
+                tot_dec_disp_e_along_normals = None
+                tot_dec_disp_e_vt_normals = None
                 
-                # 
+                
                 print(f"tot_st_idxes: {tot_st_idxes.size()}, tot_ed_idxes: {tot_ed_idxes.size()}")
                 
-                ## predict ours objbase ##
+                
                 data_scale_factor = 1.0
                 # shoudl reture
                 n_batches = tot_targets.size(0)
@@ -264,7 +221,7 @@ def main():
                 full_outputs = []
                 full_pert_verts = []
                 full_verts = []
-                full_obj_verts = [] # nn_frames x nn_obj_verts x 3 here ! #
+                full_obj_verts = []
                 
                 
                 full_dec_disp_e_along_normals = []
@@ -272,7 +229,7 @@ def main():
                 
                 for i_b in range(n_batches):
                     cur_targets = tot_targets[i_b]
-                    cur_outputs = tot_model_outputs[i_b] # ['sampled_rhand_joints']
+                    cur_outputs = tot_model_outputs[i_b]
                     cur_pert_verts = tot_pert_verts[i_b]
                     cur_verts = tot_verts[i_b]
                     
@@ -295,20 +252,15 @@ def main():
                         cur_ins_pert_verts = cur_pert_verts[cur_ins_rel_idx, ...]
                         cur_ins_verts = cur_verts[cur_ins_rel_idx, ...]
                         
-                        cur_ins_obj_orient = cur_obj_orient[cur_ins_rel_idx].numpy() # 3 --> torch.tensor
-                        cur_ins_obj_transl = cur_obj_transl[cur_ins_rel_idx].numpy() # 3 --> torch.tensor
-                        # R.from_rotvec(obj_rot).as_matrix() #
-                        # ### cur_ins_obj_rot_mtx, cur_ins_obj_transl ### #
-                        cur_ins_obj_rot_mtx = R.from_rotvec(cur_ins_obj_orient).as_matrix() # 3 x 3
-                        cur_ins_obj_transl = cur_ins_obj_transl.reshape(1, 3)
-                        # obj_verts: nn_obj_verts x 3 #
-
-                        # transformed_obj_verts = np.matmul(
-                        #     obj_verts, cur_ins_obj_rot_mtx
-                        # ) + cur_ins_obj_transl
+                        cur_ins_obj_orient = cur_obj_orient[cur_ins_rel_idx].numpy()
+                        cur_ins_obj_transl = cur_obj_transl[cur_ins_rel_idx].numpy()
                         
+                        cur_ins_obj_rot_mtx = R.from_rotvec(cur_ins_obj_orient).as_matrix()
+                        cur_ins_obj_transl = cur_ins_obj_transl.reshape(1, 3)
+
+
                         transformed_obj_verts = obj_verts
-                        full_obj_verts.append(transformed_obj_verts) ## obj_verts ##
+                        full_obj_verts.append(transformed_obj_verts)
                         
                         if args.diff_basejtse:
                             try:
@@ -316,18 +268,11 @@ def main():
                                 full_dec_disp_e_vt_normals.append(cur_dec_disp_e_vt_normals[cur_ins_rel_idx].detach().cpu().numpy())
                             except:
                                 pass
-                        # /data1/xueyi/mdm/save/trans_enc_512_rel_basejtsrelonly_lbsz_sep_model_use_sigmoid_train_enc_nusevae_dec_rel_v2_predavgjts_/model000001500.pt... 
                         full_targets.append(cur_ins_targets.detach().cpu().numpy())
                         full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
                         full_pert_verts.append(cur_ins_pert_verts.detach().cpu().numpy())
                         full_verts.append(cur_ins_verts.detach().cpu().numpy())
-                        
-                    # for i_ins in range(cur_targets.shape[-1]):
-                    #     cur_ins_rel_idx = i_ins
-                    #     cur_ins_targets = cur_targets[..., cur_ins_rel_idx]
-                    #     cur_ins_outputs = cur_outputs[..., cur_ins_rel_idx]
-                    #     full_targets.append(cur_ins_targets.detach().cpu().numpy())
-                    #     full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
+
                 ## full targets ##
                 full_targets = np.stack(full_targets, axis=0)
                 full_outputs = np.stack(full_outputs, axis=0)
@@ -339,16 +284,15 @@ def main():
                     full_dec_disp_e_along_normals = np.stack(full_dec_disp_e_along_normals, axis=0)
                     full_dec_disp_e_vt_normals = np.stack(full_dec_disp_e_vt_normals, axis=0)
                 
-                # and just use 
-                # penetration resolving # extract predictions? #
+                
                 sv_dict = {
-                    'targets': full_targets, ## p
-                    'outputs': full_outputs, ### joutput joints 
+                    'targets': full_targets, 
+                    'outputs': full_outputs, 
                     'pert_verts': full_pert_verts,
                     'verts': full_verts,
-                    'obj_verts': full_obj_verts, ### full_obj_verts; obj_faces ###
+                    'obj_verts': full_obj_verts,
                     'obj_faces': obj_faces,
-                    'tot_base_pts': tot_base_pts.numpy() / data_scale_factor, ## total base pts ##
+                    'tot_base_pts': tot_base_pts.numpy() / data_scale_factor,
                     'tot_rhand_joints': tot_rhand_joints.numpy() / data_scale_factor,
                     'tot_base_normals': tot_base_normals.numpy(), 
                     'tot_gt_rhand_joints': tot_gt_rhand_joints.numpy() / data_scale_factor,
@@ -357,8 +301,8 @@ def main():
                     'single_obj_normals': obj_vertex_normals,
                 }
                 
-                # seq_idx = int(args.single_seq_path.split("/")[-1].split(".")[0])
-                seq_idx = test_seq_idx # test seq idx #
+                
+                seq_idx = test_seq_idx
                 if args.diff_basejtse:
                     dec_e_dict = {
                         'dec_disp_e_along_normals': full_dec_disp_e_along_normals,
@@ -370,12 +314,12 @@ def main():
                     print(f"e dict ssaved to {e_dict_sv_fn}")
                 else:
                     sv_predicted_info_fn = f"predicted_infos_seq_{seq_idx}_seed_{args.seed}_tag_{args.test_tag}.npy"
-                    sv_dict_sv_fn = os.path.join(args.save_dir, sv_predicted_info_fn) # save dict fn 
+                    sv_dict_sv_fn = os.path.join(args.save_dir, sv_predicted_info_fn)
                     np.save(sv_dict_sv_fn, sv_dict)
                     print(f"Predicted infos saved to {sv_dict_sv_fn}")
 
-        except:
-            continue
+            except:
+                continue
 
     train_platform.close()
 

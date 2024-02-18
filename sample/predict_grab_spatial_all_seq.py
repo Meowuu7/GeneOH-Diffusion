@@ -20,8 +20,6 @@ import trimesh
 from scipy.spatial.transform import Rotation as R
 import numpy as np
 
-## TODO: 1) how the current prediction process functions? 
-##       2) sampling based prediction?
 
 def get_args():
     args = Namespace()
@@ -110,17 +108,7 @@ def get_base_pts_rhand_joints_from_data(data):
 
 import time
 
-def get_resplit_test_idxes():
-    test_split_mesh_nm_to_seq_idxes = "/home/xueyi/sim/motion-diffusion-model/test_mesh_nm_to_test_seqs.npy"
-    test_split_mesh_nm_to_seq_idxes = np.load(test_split_mesh_nm_to_seq_idxes, allow_pickle=True).item()
-    tot_test_seq_idxes = []
-    for tst_nm in test_split_mesh_nm_to_seq_idxes:
-        tot_test_seq_idxes = tot_test_seq_idxes + test_split_mesh_nm_to_seq_idxes[tst_nm]
-    return tot_test_seq_idxes
 
-    
-# CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.predict_ours --model_path ${model_path}  --input_text ./assets/example_pro.txt --dataset motion_ours --save_dir ${save_dir}
-# python -m train.train_mdm --save_dir save/my_humanml_trans_enc_512 --dataset motion_ours
 def main():
   
     args = train_args()
@@ -135,16 +123,9 @@ def main():
     tot_test_seq_idxes = range(1, 205, 1)
     # tot_test_seq_idxes = range(5, 6, 1)
 
-    seq_root = "/data1/xueyi/GRAB_processed/test"
+    seq_root = args.seq_root
 
-    if args.resplit:
-        tot_test_seq_idxes = get_resplit_test_idxes()
-        seq_root = "/data1/xueyi/GRAB_processed/train"
 
-    # use_reverse = True
-    # use_reverse = args.use_reverse
-    # args.save_dir = f"/data2/xueyi/eval_save/HOI_Arti/{cat_nm}"
-    args.save_dir = "/data2/xueyi/eval_save/GRAB"
     args.start_idx = 0
     # args.start_idx = 200
     # tot_test_seq_idxes = range(44, 200, 1)
@@ -164,15 +145,18 @@ def main():
     #     raise FileNotFoundError('save_dir was not specified.')
     # else: 
     #     os.makedirs(args.save_dir, exist_ok=True)
-    args_path = os.path.join(args.save_dir, 'args.json')
+        
+    args_sv_folder = "data/grab/result"
+    args_path = os.path.join(args_sv_folder, 'args_spatial.json')
+    print(f"args saved to {args_path}")
     with open(args_path, 'w') as fw:
-        json.dump(vars(args), fw, indent=4, sort_keys=True)
+        json.dump(vars(args), fw, indent=4, sort_keys=False)
     
     for cur_seed in range(0, 122, 11):
     # for test_seq_idx in tot_test_seq_idxes:
-        try:
-            for test_seq_idx in tot_test_seq_idxes:
-
+        
+        for test_seq_idx in tot_test_seq_idxes:
+            try:
                 cur_single_seq_path = os.path.join(seq_root, f"{test_seq_idx}.npy")
                 args.single_seq_path = cur_single_seq_path
                 print(f"cur_single_seq_path: {cur_single_seq_path}")
@@ -182,22 +166,9 @@ def main():
             
                 args.seed = cur_seed # random seeds #
 
-                args.predicted_info_fn = f"/data2/xueyi/eval_save/GRAB/predicted_infos_seq_{test_seq_idx}_seed_{cur_seed}_tag_jts_grab_t_400_test_.npy" 
+                args.predicted_info_fn = f"predicted_infos_seq_{test_seq_idx}_seed_{cur_seed}_tag_{args.prev_test_tag}.npy" 
                 
-                
-                #             if cat_nm == "Scissors":
-                #                 args.single_seq_path = f"/data2/xueyi/HOI_Processed_Data_Arti/{cat_nm}/{cat_nm}/case{test_seq_idx}/merged_data_with_corr.npy"
-                #                 args.cad_model_fn = f"/data2/xueyi/HOI_Processed_Data_Arti/{cat_nm}/{cat_nm}/case{test_seq_idx}/obj_model.obj"
-                #                 args.corr_fn = f"/data2/xueyi/HOI_Processed_Data_Arti/{cat_nm}/{cat_nm}/case{test_seq_idx}/merged_data.npy" # corr fn #
-                #             else:
-                #                 args.single_seq_path = f"/data2/xueyi/HOI_Processed_Data_Arti/{cat_nm}/case{test_seq_idx}/merged_data_with_corr.npy"
-                #                 args.cad_model_fn = f"/data2/xueyi/HOI_Processed_Data_Arti/{cat_nm}/case{test_seq_idx}/obj_model.obj"
-                #                 args.corr_fn = f"/data2/xueyi/HOI_Processed_Data_Arti/{cat_nm}/case{test_seq_idx}/merged_data.npy" # corr fn #
-
-
-                # args.single_seq_path = "/home/xueyi/sim/ContactOpt/./ours_data/case5/merged_data_with_corr.npy"
-                # args.cad_model_fn = "/share/datasets/HOI4D_CAD_Model_for_release/articulated/Scissors/011/objs/new-0-align.obj"
-                
+                args.predicted_info_fn = os.path.join(args.save_dir, args.predicted_info_fn)
                 
                 print(f"Current sequence path: {args.single_seq_path}, seed: {args.seed}")
                 
@@ -232,8 +203,9 @@ def main():
                 tot_base_pts,  tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl = get_base_pts_rhand_joints_from_data(data)
                 
                 
-                grab_path = "/data1/xueyi/GRAB_extracted"
-                obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+                # grab_path = args.grab_path
+                # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+                obj_mesh_path = "data/grab/object_meshes"
                 id2objmesh = []
                 obj_meshes = sorted(os.listdir(obj_mesh_path))
                 for i, fn in enumerate(obj_meshes):
@@ -250,21 +222,11 @@ def main():
                 
                 ## predict_from_data
                 print('Total params: %.2fM' % (sum(p.numel() for p in model.parameters_wo_clip()) / 1000000.0))
-                print("Training...")
-                # TrainLoop(args, train_platform, model, diffusion, data).run_loop()
-                # predict_from_data
-                
-                ## TODO: should return used objects as well ##
-                ## ==== predict from data ==== ##
-                # TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-                
-                if args.diff_basejtse:
-                    # tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals #
-                    tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts, tot_dec_disp_e_along_normals, tot_dec_disp_e_vt_normals = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-                else:
-                    tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
-                    tot_dec_disp_e_along_normals = None
-                    tot_dec_disp_e_vt_normals = None
+
+                ###### Denoising ######
+                tot_targets, tot_model_outputs, tot_st_idxes, tot_ed_idxes, tot_pert_verts, tot_verts = TrainLoop(args, train_platform, model, diffusion, data).predict_from_data()
+                tot_dec_disp_e_along_normals = None
+                tot_dec_disp_e_vt_normals = None
                 
                 # 
                 print(f"tot_st_idxes: {tot_st_idxes.size()}, tot_ed_idxes: {tot_ed_idxes.size()}")
@@ -329,7 +291,6 @@ def main():
                                 full_dec_disp_e_vt_normals.append(cur_dec_disp_e_vt_normals[cur_ins_rel_idx].detach().cpu().numpy())
                             except:
                                 pass
-                        # /data1/xueyi/mdm/save/trans_enc_512_rel_basejtsrelonly_lbsz_sep_model_use_sigmoid_train_enc_nusevae_dec_rel_v2_predavgjts_/model000001500.pt... 
                         full_targets.append(cur_ins_targets.detach().cpu().numpy())
                         full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
                         full_pert_verts.append(cur_ins_pert_verts.detach().cpu().numpy())
@@ -387,8 +348,8 @@ def main():
                     np.save(sv_dict_sv_fn, sv_dict)
                     print(f"Predicted infos saved to {sv_dict_sv_fn}")
 
-        except:
-            continue
+            except:
+                continue
 
     train_platform.close()
 

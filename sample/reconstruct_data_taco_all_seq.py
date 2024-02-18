@@ -5471,12 +5471,6 @@ if __name__=='__main__':
     st_idxx = 0
     # st_idxx = 19
 
-    # jts_t_50_rep_arctic_use_left_st_100__multi.npy
-    # /data2/sim/eval_save/HOI_Arti/Scissors/predicted_infos_seq_8_seed_66_tag_rep_res_jts_hoi4d_arti_scissors_t_300_st_idx_0_.npy
-    # /data2/sim/eval_save/HOI_Arti/Scissors/predicted_infos_seq_6_seed_66_tag_jts_rep_hoi4d_arti_t_300_.npy
-    ### the test seq ### #
-    # for i_test_seq in range(st_idx, ed_idx): # arctic seq paths #
-    #   for i_test_seq in range(st_idx, ed_idx): #  
     for i_test_seq, (cur_seq_path, cur_seq_tag) in enumerate(zip(tot_seq_paths, tot_seq_tags)):
         if i_test_seq < st_idxx:
             continue
@@ -5484,10 +5478,8 @@ if __name__=='__main__':
 
             tot_data = {}
             for i_tag, cur_test_tag in enumerate(test_tags):
-                # /data3/datasets/xueyi/hho_save_res/predicted_infos_seed_110_tag_20231104_001_jts_t_400_hho__st_80.npy
-                # pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{cur_test_tag}.npy"
+
                 pred_joints_info_nm = f"predicted_infos_seed_{seed}_tag_{cur_test_tag}.npy"
-                # f"predicted_infos_seq_{seq_idx}_{cur_seq_tag}_seed_{args.seed}_tag_{args.test_tag}.npy"
                 cur_pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm)
                 print(f"cur_pred_joints_info_fn: {cur_pred_joints_info_fn}")
                 if not os.path.exists(cur_pred_joints_info_fn):
@@ -5573,20 +5565,16 @@ if __name__=='__main__':
                         tot_base_normals, tot_obj_rot
                     ) 
                 
-                # rhand_verts, rhand_joints = get_optimized_hand_fr_joints_v4_anchors_fr_params(rhand_betas, rhand_rot, rhand_theta, rhand_transl, tot_base_pts_trans)
-                # reconstruct_data_bundle #
                 optimized_sv_infos = {
                 'optimized_out_hand_verts': rhand_verts,
                 'optimized_out_hand_joints': rhand_joints,
                 'tot_base_pts_trans': tot_base_pts_trans,
                 'optimized_out_hand_verts_before_contact_opt': rhand_verts,
                 'optimized_out_hand_joints_before_contact_opt': rhand_joints,
-                'outputs': rhand_joints # .detach().cpu().numpy(),
+                'outputs': rhand_joints
                 }
-                pred_infos_sv_folder = "/data1/xueyi/mdm/eval_save/" # predicted infos and 
-                # pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
-                # /data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_7_seed_77_tag_rep_only_real_mean_t_200_.npy
-                # optimized_infos_sv_dict_seq_12_seed_77_tag_rep_only_real_mean_same_noise_hoi4d_t_200_.npy # test_tag #
+                pred_infos_sv_folder = "/data1/xueyi/mdm/eval_save/"
+
                 optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
                 optimized_sv_infos_sv_fn = os.path.join(pred_infos_sv_folder, optimized_sv_infos_sv_fn_nm)
                 np.save(optimized_sv_infos_sv_fn, optimized_sv_infos)
@@ -5648,16 +5636,7 @@ if __name__=='__main__':
             
             with_ctx_mask = True
             
-            # optimized_out_hand_verts, optimized_out_hand_joints, bf_ct_verts, bf_ct_joints = get_optimized_hand_fr_joints_v4(outputs, tot_base_pts, tot_base_pts_trans, tot_base_normals_trans, with_contact_opt=with_contact_opt)
             
-            
-            # nn_frames x 3; nn_frames x 45; 10
-            # transl_var, theta_var, rot_var, beta_var # 
-            # optimized out hand verts # 
-            # rt_vars: transl_var, theta_var, rot_var, beta_var # 
-            ## get hand fr joints v4 anchors ##
-            #### optimized hand fr joints v4 anchors ####
-            #   nn_hand_params = 24
             nn_hand_params = 45
             
             dist_thres = 0.005
@@ -5667,47 +5646,22 @@ if __name__=='__main__':
             tot_dist_thres = [0.001, 0.002, 0.005, 0.01, 0.02, 0.1]
             tot_dist_thres = [0.001]
 
-            # if cat_nm in ["Scissors"]:
-            #     tot_dist_thres = [0.005, 0.01]
-            #     tot_dist_thres = [0.005, 0.01, 0.02]
-            #     # tot dist thresholds #
-            #     tot_dist_thres = [0.005, 0.01, 0.02, 0.05, 0.1]
-            #     # for one frame tests 
-            #     # tot_dist_thres = [0.005]
-
-            # tot_dist_thres = [0.005]
-            #### with_contact_opt = True #### with_ctx_
-            # tot_dist_thres = [0.01, 0.02, 0.05, 0.1]
-            # distances between 
-            ###
-            # tot_dist_thres = [0.01]
-            
-            # with_ctx_mask
-            # tot_with_proj = [True, False]
-            
             tot_with_proj = [ False]
 
             # ToyCar
             with_params_smoothing = True
             
-            # if 'use_left' in test_tag:
-            use_left = True
-            # else:
-            #     use_left = False
-            #   use_left = False
             
+            use_left = True
+
+
             for with_proj in tot_with_proj:
                 for dist_thres in tot_dist_thres:
                     with_proj = False
-                    # with_proj = True
 
-                    # ToycAr
-                    #   with_proj = True
-                    if cat_nm in ["Scissors", "Chair"]: # no proj
+                    if cat_nm in ["Scissors", "Chair"]:
                         with_proj = False
-                        # with_proj = True
-                        # with_params_smoothing = False
-                    # with_contact_opt = False
+
                     with_contact_opt = True
                     with_ctx_mask = False
 
@@ -5727,8 +5681,7 @@ if __name__=='__main__':
                     )
                     
                     
-                    optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tags[0]}_{cur_seq_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wmaskanchors_multi_ntag_{len(test_tags)}.npy" # # test_tages ##
-                    # optimized_sv_infos_sv_fn = os.path.join(pred_infos_sv_folder, optimized_sv_infos_sv_fn_nm)
+                    optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tags[0]}_{cur_seq_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wmaskanchors_multi_ntag_{len(test_tags)}.npy"
                     optimized_sv_infos_sv_fn = os.path.join(new_pred_infos_sv_folder, optimized_sv_infos_sv_fn_nm)
                     np.save(optimized_sv_infos_sv_fn, optimized_sv_infos)
                     print(f"optimized infos saved to {optimized_sv_infos_sv_fn}")

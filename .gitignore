@@ -8,3 +8,9 @@ data/*/*.zip
 
 *.npy
 
+
+scripts/*/*_bak.sh
+
+__pycache__/
+
+*/__pycache__

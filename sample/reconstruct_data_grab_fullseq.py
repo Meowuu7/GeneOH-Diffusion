@@ -2653,28 +2653,103 @@ if __name__=='__main__':
     cat_nm = "GRAB"
 
 
+    ##### Get st_idxes #####
+    pure_file_name = single_seq_path.split("/")[-1].split(".")[0]
+    split = single_seq_path.split("/")[-2]
+    subj_data_folder = args.grab_processed_dir + "_wsubj"
+    pure_subj_params_fn = f"{pure_file_name}_subj.npy"  
+            
+    subj_params_fn = os.path.join(subj_data_folder, split, pure_subj_params_fn)
+    subj_params = np.load(subj_params_fn, allow_pickle=True).item()
+    rhand_transl = subj_params["rhand_transl"]
+    nn_frames = rhand_transl.shape[0]
+    
+    nn_st_skip = 30
+    num_cleaning_frames = 60
+    num_ending_clearning_frames = nn_frames - num_cleaning_frames + 1
+
+    print(range(0, num_ending_clearning_frames, nn_st_skip))
+    
+    st_idxes = list(range(0, num_ending_clearning_frames, nn_st_skip))
+    if st_idxes[-1] + num_cleaning_frames < nn_frames:
+        st_idxes.append(nn_frames - num_cleaning_frames)
+    print(f"st_idxes: {st_idxes}")
+    clip_ending_idxes = [st_idxes[cur_ts + 1] - st_idxes[cur_ts] for cur_ts in range(len(st_idxes) - 1)]
+    ##### Get st_idxes #####
+    
 
     tot_rnd_seeds = range(0, 121, 11)
 
     for seed in tot_rnd_seeds:
-        pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
+        # pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
         
-        pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm) #
+        # pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm) #
         
-        # print(f"pred_joints_info_fn: {pred_joints_info_fn}")
-        if not os.path.exists(pred_joints_info_fn):
-            continue
+        # # print(f"pred_joints_info_fn: {pred_joints_info_fn}")
+        # if not os.path.exists(pred_joints_info_fn):
+        #     continue
 
-
-        pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm)
-        data = np.load(pred_joints_info_fn, allow_pickle=True).item()
+        # pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm)
+        # data = np.load(pred_joints_info_fn, allow_pickle=True).item()
         # outputs = targets # outputs # targets # 
         
+        
+        ############ Merge data ############
+        tot_data = {}
+        for i_tag, cur_st_idx in enumerate(st_idxes):
+            pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_st_{cur_st_idx}_tag_{test_tag}.npy"
+            cur_pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm)
+            print(f"cur_pred_joints_info_fn: {cur_pred_joints_info_fn}")
+            if not os.path.exists(cur_pred_joints_info_fn):
+                continue
+            cur_data = np.load(cur_pred_joints_info_fn, allow_pickle=True).item()
+            print(f"Data loaded from {cur_pred_joints_info_fn}")
+            if i_tag == len(st_idxes) - 1:
+                for cur_k in cur_data:
+                    if cur_k not in tot_data:
+                        if i_tag == len(st_idxes) - 1:
+                            tot_data[cur_k] = [cur_data[cur_k]]
+                        else:
+                            tot_data[cur_k] = [cur_data[cur_k]]
+                    else:
+                        tot_data[cur_k].append(cur_data[cur_k])
+            else:
+                for cur_k in cur_data: # fov
+                    if cur_k not in tot_data:
+                        if cur_k in ["tot_base_pts", "tot_base_normals", "tot_obj_rot", "tot_obj_transl", "tot_obj_pcs", "tot_rhand_joints", "tot_gt_rhand_joints"]:
+                            tot_data[cur_k] = [cur_data[cur_k][:, :clip_ending_idxes[i_tag]]]
+                        else:
+                            if cur_k in ['template_obj_fs']:
+                                tot_data[cur_k] = [cur_data[cur_k]]
+                            else:
+                                tot_data[cur_k] = [cur_data[cur_k][ :clip_ending_idxes[i_tag]]]
+                    else:
+                        if cur_k in ["tot_base_pts", "tot_base_normals", "tot_obj_rot", "tot_obj_transl", "tot_obj_pcs", "tot_rhand_joints", "tot_gt_rhand_joints"]:
+                            tot_data[cur_k].append(cur_data[cur_k][:, :clip_ending_idxes[i_tag]])
+                        else:
+                            if cur_k not in ['template_obj_fs']:
+                                tot_data[cur_k].append(cur_data[cur_k][ :clip_ending_idxes[i_tag]])
+                
+        for cur_k in tot_data:
+            if cur_k in ["tot_base_pts", "tot_base_normals", "tot_obj_rot", "tot_obj_transl", "tot_obj_pcs", "tot_rhand_joints", "tot_gt_rhand_joints"]:
+                tot_data[cur_k] = np.concatenate(tot_data[cur_k], axis=1)
+            else:
+                tot_data[cur_k] = np.concatenate(tot_data[cur_k], axis=0)
+            print(f"cur_k: {cur_k}, {tot_data[cur_k].shape}")
+        
+        
+        data = tot_data
+        print(f"data: {data.keys()}")
+        ############ Merge data ############
+        
+        
+        
+        
+        
+        
         targets = data['targets'] # ## targets -> targets and outputs ##
-        outputs = data['outputs'] #  
-        # tot_base_pts = data["tot_base_pts"][0] # total base pts, total base normals #
-        # tot_base_normals = data['tot_base_normals'][0] # nn_base_normals #
-      
+        outputs = data['outputs']
+        
         tot_obj_rot = data['tot_obj_rot'][0] # ws x 3 x 3 ---> obj_rot; #
         tot_obj_transl = data['tot_obj_transl'][0]
         tot_base_pts = data["tot_base_pts"][0]

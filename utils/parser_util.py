@@ -293,6 +293,10 @@ def add_base_options(parser):
     # use_pose_pred
     group.add_argument("--use_pose_pred", default=False, action='store_true', help="Use cuda device, otherwise use CPU.")
     group.add_argument("--use_hho", default=False, action='store_true', help="Use cuda device, otherwise use CPU.")
+    # seq_root
+    group.add_argument("--seq_root", default="", type=str,)
+    group.add_argument("--grab_path", default="", type=str,)
+    
 
 
 def add_diffusion_options(parser):

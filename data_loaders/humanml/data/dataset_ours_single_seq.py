@@ -55,17 +55,7 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         
         # self.start_idx = args.start_idx # clip starting idxes #
         self.start_idx = 0
-        
-        # load datas # grab path; grab sequences #
-        # grab_path =  "/data1/xueyi/GRAB_extracted"
-        # ## grab contactmesh ## id2objmeshname
-        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        # id2objmeshname = []
-        # obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # # objectmesh name #
-        # id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        # self.id2objmeshname = id2objmeshname
-        
+
         # obj_mesh_path = "data/grab/object_meshes"
         obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
@@ -95,7 +85,7 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         ## predicted infos fn ##
         self.data_folder = data_folder
         # self.subj_data_folder = data_folder
-        self.subj_data_folder = data_folder
+        self.subj_data_folder = data_folder + "_wsubj"
         # self.subj_corr_data_folder = args.subj_corr_data_folder
         # manopth/mano/models
         self.mano_path = "manopth/mano/models" ### mano_path
@@ -197,35 +187,6 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
             joint_rot_mode='axisang'
         )
         
-        
-        ### Load field data from root folders ### ## obj root folder ##
-        # self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        # self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
-        
-        
-        # # anchor_load_driver, masking_load_driver #
-        # # use_anchors, self.hand_palm_vertex_mask #
-        # if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-        #     # anchor_load_driver, masking_load_driver #
-        #     inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-        #     fvi, aw, _, _ = anchor_load_driver(inpath)
-        #     self.face_vertex_index = torch.from_numpy(fvi).long()
-        #     self.anchor_weight = torch.from_numpy(aw).float()
-            
-        #     anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-        #     palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-        #     hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-        #     # self.hand_palm_vertex_mask for hand palm mask #
-        #     self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
-        
-        
-        ## actions taken 
-        # self.clip_sv_folder = os.path.join(data_folder, f"{split}_clip")
-        # os.makedirs(self.clip_sv_folder, exist_ok=True)
-
-        # files_clean = glob.glob(os.path.join(data_folder, split, '*.npy'))
-        # #### filter files_clean here ####
-        # files_clean = [cur_f for cur_f in files_clean if ("meta_data" not in cur_f and "uvs_info" not in cur_f)]
         
         files_clean = [self.seq_path]
         
@@ -332,13 +293,8 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         
         pert_subj_params_fn = os.path.join(self.subj_data_folder, pert_folder_nm, pure_subj_params_fn)
         pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
-        ##### load subj params #####
-        
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
-        # maxx_clip_len = 
+
+
         loaded_clip = (
             0, rhand_transl.shape[0], clip_clean,
             [clip_clean['f9'], clip_clean['f11'], clip_clean['f10'], clip_clean['f1'],  clip_clean['f2'], rhand_transl, rhand_betas, object_global_orient, object_trcansl, object_idx], pert_subj_params, 
@@ -358,7 +314,7 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
             self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
         return self.id2meshdata[obj_id]
 
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
+
     def __getitem__(self, index):
 
         i_c = 0
@@ -940,18 +896,7 @@ class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
         self.seq_path = args.single_seq_path ## single seq path ##
         
         self.inst_normalization = args.inst_normalization
-        
-        
-        # # load datas # grab path; grab sequences #
-        # grab_path =  "/data1/xueyi/GRAB_extracted"
-        # ## grab contactmesh ## id2objmeshname
-        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        # id2objmeshname = []
-        # obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # # objectmesh name #
-        # id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        # self.id2objmeshname = id2objmeshname
-        
+         
         
         ## the predicted_info_fn
         predicted_info_fn = args.predicted_info_fn
@@ -1014,7 +959,7 @@ class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
         
         
         self.data_folder = data_folder
-        self.subj_data_folder = data_folder # subj_data_folder
+        self.subj_data_folder = data_folder + "_wsubj"
         # self.subj_corr_data_folder = args.subj_corr_data_folder
         self.mano_path = "manopth/mano/models" ### mano_path
         self.aug = True
@@ -2968,15 +2913,15 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         # self.start_idx = args.start_idx # clip starting idxes #
         self.start_idx = self.args.start_idx
         
-        # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
-        ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
-        id2objmeshname = []
-        obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # objectmesh name #
-        id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
-        self.id2objmeshname = id2objmeshname
+        # # load datas # grab path; grab sequences #
+        # grab_path =  "/data1/xueyi/GRAB_extracted"
+        # ## grab contactmesh ## id2objmeshname
+        # obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
+        # id2objmeshname = []
+        # obj_meshes = sorted(os.listdir(obj_mesh_path))
+        # # objectmesh name #
+        # id2objmeshname = [obj_meshes[i].split(".")[0] for i in range(len(obj_meshes))]
+        # self.id2objmeshname = id2objmeshname
         
         
         
@@ -2998,7 +2943,7 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         
         ## predicted infos fn ##
         self.data_folder = data_folder
-        self.subj_data_folder = data_folder
+        self.subj_data_folder = data_folder + "_wsubj"
         # self.subj_corr_data_folder = args.subj_corr_data_folder
         self.mano_path = "manopth/mano/models" ### mano_path
         ## mano paths ##
@@ -3166,15 +3111,15 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         #     # subj_corr_data, pert_subj_corr_data
         #     ))
         
-    def get_idx_to_mesh_data(self, obj_id):
-        if obj_id not in self.id2meshdata:
-            obj_nm = self.id2objmesh[obj_id]
-            obj_mesh = trimesh.load(obj_nm, process=False) # obj mesh obj verts 
-            obj_verts = np.array(obj_mesh.vertices)
-            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-            obj_faces = np.array(obj_mesh.faces)
-            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
-        return self.id2meshdata[obj_id]
+    # def get_idx_to_mesh_data(self, obj_id):
+    #     if obj_id not in self.id2meshdata:
+    #         obj_nm = self.id2objmesh[obj_id]
+    #         obj_mesh = trimesh.load(obj_nm, process=False) # obj mesh obj verts 
+    #         obj_verts = np.array(obj_mesh.vertices)
+    #         obj_vertex_normals = np.array(obj_mesh.vertex_normals)
+    #         obj_faces = np.array(obj_mesh.faces)
+    #         self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
+    #     return self.id2meshdata[obj_id]
 
     #### enforce correct contacts #### ### the sequence in the clip is what we want here #
     def __getitem__(self, index): # get item; articulated objects? #
@@ -3927,7 +3872,7 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
         ## predicted infos fn ##
         self.data_folder = data_folder
-        self.subj_data_folder = data_folder
+        self.subj_data_folder = data_folder + "_wsubj"
         # self.subj_corr_data_folder = args.subj_corr_data_folder
         self.mano_path = "manopth/mano/models" ### mano_path
         ## mano paths ##
@@ -4162,15 +4107,15 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
     
         
-    def get_idx_to_mesh_data(self, obj_id):
-        if obj_id not in self.id2meshdata:
-            obj_nm = self.id2objmesh[obj_id]
-            obj_mesh = trimesh.load(obj_nm, process=False) # obj mesh obj verts 
-            obj_verts = np.array(obj_mesh.vertices)
-            obj_vertex_normals = np.array(obj_mesh.vertex_normals)
-            obj_faces = np.array(obj_mesh.faces)
-            self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
-        return self.id2meshdata[obj_id]
+    # def get_idx_to_mesh_data(self, obj_id):
+    #     if obj_id not in self.id2meshdata:
+    #         obj_nm = self.id2objmesh[obj_id]
+    #         obj_mesh = trimesh.load(obj_nm, process=False) # obj mesh obj verts 
+    #         obj_verts = np.array(obj_mesh.vertices)
+    #         obj_vertex_normals = np.array(obj_mesh.vertex_normals)
+    #         obj_faces = np.array(obj_mesh.faces)
+    #         self.id2meshdata[obj_id] = (obj_verts, obj_vertex_normals, obj_faces)
+    #     return self.id2meshdata[obj_id]
 
     #### enforce correct contacts #### ### the sequence in the clip is what we want here #
     def __getitem__(self, index): # get item; articulated objects? #
