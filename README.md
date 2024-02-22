@@ -3,7 +3,7 @@
 
 ### [Project](https://meowuu7.github.io/GeneOH-Diffusion/) | [Gradio Demo](https://huggingface.co/spaces/xymeow7/gene-hoi-denoising) | [OpenReview](https://openreview.net/forum?id=FvK2noilxT)
 
-The PyTorch implementation of the paper [**GeneOH Diffusion**](https://meowuu7.github.io/GeneOH-Diffusion/). 
+The PyTorch implementation of the paper [**GeneOH Diffusion**](https://meowuu7.git**hub.io/GeneOH-Diffusion/), a **generalizable HOI denoising model** for **curating high-quality interaction data**.
 
 
 https://github.com/Meowuu7/GeneOH-Diffusion/assets/50799886/56ed6bbc-006c-4d41-9449-7793c78de9be
