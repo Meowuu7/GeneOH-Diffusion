@@ -9,7 +9,7 @@ import numpy as np
 import os, argparse, copy, json
 import pickle as pkl
 from scipy.spatial.transform import Rotation as R
-from psbody.mesh import Mesh
+# from psbody.mesh import Mesh
 from manopth.manolayer import ManoLayer
 
 import trimesh
@@ -98,17 +98,17 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
   nn_frames = joints.size(0)
   
   
-  # anchor_load_driver, masking_load_driver #
-  inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-  fvi, aw, _, _ = anchor_load_driver(inpath)
-  face_vertex_index = torch.from_numpy(fvi).long().cuda()
-  anchor_weight = torch.from_numpy(aw).float().cuda()
+  # # anchor_load_driver, masking_load_driver #
+  # inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
+  # fvi, aw, _, _ = anchor_load_driver(inpath)
+  # face_vertex_index = torch.from_numpy(fvi).long().cuda()
+  # anchor_weight = torch.from_numpy(aw).float().cuda()
   
-  anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-  palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-  hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-  # self.hand_palm_vertex_mask for hand palm mask #
-  hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool().cuda() ## the mask for hand palm to get hand anchors #
+  # anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
+  # palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
+  # hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
+  # # self.hand_palm_vertex_mask for hand palm mask #
+  # hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool().cuda() ## the mask for hand palm to get hand anchors #
       
   
   
@@ -645,8 +645,8 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
         # transl_smoothness_loss
         print('\tTransl Smoothness Loss: {}'.format(transl_smoothness_loss.item()))
   
-  rhand_anchors_np = rhand_anchors.detach().cpu().numpy()
-  np.save("out_anchors.npy", rhand_anchors_np)
+  # rhand_anchors_np = rhand_anchors.detach().cpu().numpy()
+  # np.save("out_anchors.npy", rhand_anchors_np)
   ### optimized dict before projection ###
   bf_proj_optimized_dict = {
     'bf_ctx_mask_verts': hand_verts.detach().cpu().numpy(),
@@ -1246,7 +1246,7 @@ if __name__=='__main__':
     
     with_proj = False
 
-    with_contact_opt = True
+    with_contact_opt = False
     with_ctx_mask = False
 
     bf_ct_optimized_dict, bf_proj_optimized_dict, optimized_dict = get_optimized_hand_fr_joints_v4_anchors(outputs, tot_base_pts, tot_base_pts_trans, tot_base_normals_trans, with_contact_opt=with_contact_opt, nn_hand_params=nn_hand_params, rt_vars=True, with_proj=with_proj, obj_verts_trans=obj_verts_trans, obj_faces=obj_faces, with_params_smoothing=with_params_smoothing, dist_thres=dist_thres, with_ctx_mask=with_ctx_mask)

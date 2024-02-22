@@ -11,6 +11,8 @@ export save_dir=./data/taco/result
 
 
 export cuda_ids=0
-# bash scripts/val/reconstruct_taco.sh
+
+# val_examples/reconstruct_taco_20231104_017.sh
+# bash scripts/val_examples/reconstruct_taco_20231104_017.sh
 CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.reconstruct_data_taco --save_dir=${save_dir} --test_tag=${test_tag} --single_seq_path=${single_seq_path}
 

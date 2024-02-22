@@ -96,20 +96,7 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         
         self.use_anchors = args.use_anchors
         
-        # self.grab_path = "/data1/xueyi/GRAB_extracted"
-        # obj_mesh_path = "data/grab/object_meshes"
-        # id2objmesh = []
-        # obj_meshes = sorted(os.listdir(obj_mesh_path))
-        # for i, fn in enumerate(obj_meshes):
-        #     id2objmesh.append(os.path.join(obj_mesh_path, fn))
-        # self.id2objmesh = id2objmesh
-        # self.id2meshdata = {}
-        
-        ## obj root folder; ##
-        ### Load field data from root folders ###
-        # self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        # self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
-        
+
         ''' Load avg, std statistics '''
         # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
         # rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
@@ -966,9 +953,6 @@ class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
         self.use_anchors = False
 
         
-        # self.grab_path = "/data1/xueyi/GRAB_extracted"
-        
-        # obj_mesh_path = "data/grab/object_meshes"
         obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
@@ -977,10 +961,6 @@ class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
         self.id2objmesh = id2objmesh
         self.id2meshdata = {}
         
-        # ## obj root folder; ##
-        # ### Load field data from root folders ###
-        # self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        # self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
         
         ''' Load avg, std statistics '''
         # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
@@ -1807,7 +1787,6 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         if len(predicted_info_fn) > 0:
             print(f"Loading preidcted info from {predicted_info_fn}")
             data = np.load(predicted_info_fn, allow_pickle=True).item()
-            # /data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_scissors_optimized_aug.npy
             data_opt_info_fn = "/data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_scissors_optimized_aug.npy"
             data_opt = np.load(data_opt_info_fn, allow_pickle=True).item()
             outputs = data['outputs']
@@ -2011,7 +1990,7 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
             else:
                 if cat_nm in ["Scissors", "Laptop"]:
                     if self.args.use_reverse:
-                        cad_model_fn = [ # get cad models 
+                        cad_model_fn = [
                             f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm, 
                             f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm 
                         ]
@@ -3843,9 +3822,8 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         self.start_idx = self.args.start_idx
         
         # load datas # grab path; grab sequences #
-        grab_path =  "/data1/xueyi/GRAB_extracted"
+        obj_mesh_path = "data/grab/object_meshes"
         ## grab contactmesh ## id2objmeshname
-        obj_mesh_path = os.path.join(grab_path, 'tools/object_meshes/contact_meshes')
         id2objmeshname = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
         # objectmesh name #
@@ -3882,7 +3860,7 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
         self.use_anchors = args.use_anchors
         
-        self.grab_path = "/data1/xueyi/GRAB_extracted"
+        # self.grab_path = "/data1/xueyi/GRAB_extracted"
         obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
@@ -3891,10 +3869,6 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         self.id2objmesh = id2objmesh
         self.id2meshdata = {}
         
-        ## obj root folder; ##
-        ### Load field data from root folders ###
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params" # # and base points 
         
         self.load_meta = True
         
@@ -3927,9 +3901,6 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         if len(predicted_info_fn) > 0:
             print(f"Loading preidcted info from {predicted_info_fn}")
             data = np.load(predicted_info_fn, allow_pickle=True).item()
-            # /data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_scissors_optimized_aug.npy
-            # data_opt_info_fn = "/data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_scissors_optimized_aug.npy"
-            # data_opt = np.load(data_opt_info_fn, allow_pickle=True).item()
             outputs = data['outputs'] # 
             self.predicted_hand_joints = outputs # nf x nnjoints x 3 #
             self.predicted_hand_joints = torch.from_numpy(self.predicted_hand_joints).float()
@@ -3996,8 +3967,7 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         self.lft_mano_layer = ManoLayer(
             flat_hand_mean=True,
             side='left',
-            # mano_root=self.mano_path, # mano_root #
-            mano_root="/home/hlyang/HOI/HOI/manopth/mano/models",
+            mano_root=self.mano_path, # mano_root #
             ncomps=45,
             use_pca=False,
             # center_idx=0
@@ -4005,10 +3975,6 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
             # joint_rot_mode='axisang'
         )
         
-        
-        ### Load field data from root folders ### ## obj root folder ##
-        self.obj_root_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_objs"
-        self.obj_params_folder = "/data1/xueyi/GRAB_extracted/tools/object_meshes/contact_meshes_params"
         
         
         # anchor_load_driver, masking_load_driver #

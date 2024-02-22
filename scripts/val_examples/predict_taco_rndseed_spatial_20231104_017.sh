@@ -123,7 +123,7 @@ export seed=0
 export save_dir=data/taco/result
 
 
-export cuda_ids=2
+export cuda_ids=0
 
 
 # bash scripts/val_examples/predict_taco_rndseed_spatial_20231104_017.sh

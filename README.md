@@ -238,13 +238,16 @@ To reproduce the above result, follow the steps below:
 
 
 ## TODOs
+
 - [x] Example usage, evaluation process and pre-trained models
 - [ ] Evaluation process on HOI4D, ARCTIC
 - [ ] Data: HOI4D, ARCTIC, and more examples on TACO
 - [ ] Training procedure
   
 
+## Contact
 
+Please contact xymeow7@gmail.com or create a github issue if you have any questions.
 
 
 ## Bibtex

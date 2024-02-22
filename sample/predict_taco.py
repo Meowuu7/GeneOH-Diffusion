@@ -155,6 +155,8 @@ def main():
     if st_idxes[-1] + num_cleaning_frames < nn_frames:
         st_idxes.append(nn_frames - num_cleaning_frames)
     print(f"st_idxes: {st_idxes}")
+    
+    # st_idxes = st_idxes[1:]
     ######## Get st_idxes ########
     
     for cur_seed in range(0, 122, 11):
