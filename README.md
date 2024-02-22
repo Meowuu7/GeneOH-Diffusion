@@ -183,7 +183,7 @@ The input noisy trajectory is constructed by adding noise from a Beta distirbuti
 
 |        Input        |       Result 1         |         Result 2         |
 | :----------------------: | :---------------------: | :-----------------------: |
-| ![](assets/grab-14-input-beta.gif) | ![](assets/grab-14-res-1-beta.gif) | ![](assets/grab-14-res-2-beta.gif) |
+| ![](assets/grab-14-input-beta-2.gif) | ![](assets/grab-14-res-1-beta.gif) | ![](assets/grab-14-res-2-beta.gif) |
 
 
 To reproduce this result, use the scripts located in the `scripts/val_examples` directory. Please notice that the `pert_type` argument in each `.sh` file should be set to `beta`. 
