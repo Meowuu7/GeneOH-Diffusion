@@ -5,7 +5,11 @@
 
 The PyTorch implementation of the paper [**GeneOH Diffusion**](https://meowuu7.github.io/GeneOH-Diffusion/). 
 
-![teaser](./assets/geneoh-diffusion-github-teaser.gif)
+
+https://github.com/Meowuu7/GeneOH-Diffusion/assets/50799886/56ed6bbc-006c-4d41-9449-7793c78de9be
+
+
+
 
 The repository contains 
 - Pre-trained models and example usage (on three datasets);
