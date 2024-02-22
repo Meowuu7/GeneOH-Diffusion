@@ -1,16 +1,17 @@
-# Generalizable HOI Denoising
+# Generalizable Hand-Object Interaction (HOI) Denoising
 
 
 ### [Project](https://meowuu7.github.io/GeneOH-Diffusion/) | [Gradio Demo](https://huggingface.co/spaces/xymeow7/gene-hoi-denoising) | [OpenReview](https://openreview.net/forum?id=FvK2noilxT)
 
-The PyTorch implementation of the paper [**"GeneOH Diffusion"**](https://meowuu7.github.io/GeneOH-Diffusion/). 
+The PyTorch implementation of the paper [**GeneOH Diffusion**](https://meowuu7.github.io/GeneOH-Diffusion/). 
 
-![teaser](./assets/demo.gif)
+![teaser](./assets/geneoh-diffusion-github-teaser.gif)
 
 The repository contains 
-- Pre-trained models and example usage (on three datasets)
-- Evaluation process on two of our test datasets
-Tthe evaluation process on remaining test datasets and the training procedure will be added. 
+- Pre-trained models and example usage (on three datasets);
+- Evaluation processes for two of our test datasets.
+
+We will add the data and the evaluation process for the remaining test datasets, as well as the training procedure. These updates are expected to be completed before May 2024.
 
 ## Getting started
 
@@ -54,22 +55,32 @@ pip install -e .
 cd ..
 ```
 
-**Note that the MANO layer we use is slightly different from the original official release. The `manopth` package should be install from this project otherwise the model would produce wierd denoised results.**
+**Please note that the MANO layer utilized in our project deviates slightly from the original official release. It is essential to install the manopth package from this project, as failure to do so may result in abnormal denoised outcomes from the model.**
+
 
 ### 2. Download pre-trained models
 
-Download models from [here](https://drive.google.com/drive/folders/1_0p2REWdisKx2sCAvHkOHsNFjZUwi87h?usp=sharing) and put them under the folder `./ckpts`. 
+Download models from [this link](https://drive.google.com/drive/folders/1_0p2REWdisKx2sCAvHkOHsNFjZUwi87h?usp=sharing) and place them in the `./ckpts` folder. 
 
 ### 3. Get data 
 
 **1. GRAB**
 
-- Download [preprocessed data (object, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgS4lAVZmVnhp4c-2?e=njx6oZ). Extract them under a data folder for GRAB preprocessed object data (*e.g.* `./data/grab/GRAB_processed`). 
+- Download the [preprocessed data (object, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgS4lAVZmVnhp4c-2?e=njx6oZ) and extract it into a data folder for GRAB preprocessed object data (e.g., `./data/grab/GRAB_processed`).
+
+- Download the [GRAB object meshes](https://drive.google.com/file/d/19uvDxyHR9-kFi6wsU-7XFI5HoJu7MaZE/view?usp=sharing) and unzip the obtained `object_meshes.zip` into the folder `./data/grab`.
+
+- Download the [preprocessed data (hand, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgTCIWuIDnf3J9BuK?e=1HsJXu) and extract it into a data folder for GRAB preprocessed subject data (e.g., `./data/grab/GRAB_processed_wsubj`).
+
+<!-- - Download [preprocessed data (object, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgS4lAVZmVnhp4c-2?e=njx6oZ). Extract them under a data folder for GRAB preprocessed object data (*e.g.* `./data/grab/GRAB_processed`). 
 - Download [GRAB object meshes](https://drive.google.com/file/d/19uvDxyHR9-kFi6wsU-7XFI5HoJu7MaZE/view?usp=sharing) and unzip the obtained `object_meshes.zip` under the folder `./data/grab`.
-- Download [preprocessed data (hand, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgTCIWuIDnf3J9BuK?e=1HsJXu). Extract them under a data folder for GRAB preprocessed subject data (*e.g.* `./data/grab/GRAB_processed_wsubj`). 
+- Download [preprocessed data (hand, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgTCIWuIDnf3J9BuK?e=1HsJXu). Extract them under a data folder for GRAB preprocessed subject data (*e.g.* `./data/grab/GRAB_processed_wsubj`).  -->
 
 **2. TACO**
-We include data samples from a recent [TACO dataset](https://taco2024.github.io/) in the folder `./data/taco/source_data` for test. More data is coming. 
+
+Besides the test datasets mentioned in the paper, we've also evaluated our model on a recent [TACO dataset](https://taco2024.github.io/). Data samples for testing purposes have been included in the folder `./data/taco/source_data`. More data will be incorporated soon.
+
+
 
 
 
@@ -81,9 +92,9 @@ We include data samples from a recent [TACO dataset](https://taco2024.github.io/
 
 **Example**
 
-> An example of cleaning an input trajectory (sequence 14 of GRAB's test split) with Gaussian noise.
+> Here's an example of cleaning an input trajectory (sequence 14 of GRAB's test split) with Gaussian noise.
 
-Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The input sequence and two different samples are shown as below. 
+The input noisy trajectory is constructed by adding Gaussian noise onto the trajectory `data/grab/source_data/14.npy`. And two different denoised samples are shown as below. 
 
 
 |        Input        |       Result 1         |         Result 2         |
@@ -91,7 +102,7 @@ Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The 
 | ![](assets/grab-14-input.gif) | ![](assets/grab-14-res.gif) | ![](assets/grab-14-res-2.gif) |
 
 
-Follow steps below to reproduce the above result. 
+To reproduce the above result, follow the steps below:
 
 1. **Denoising**
    ```bash
@@ -114,7 +125,7 @@ Follow steps below to reproduce the above result.
 **Evaluate on the test split** 
 
 1. **Update data and experimental paths in `.sh` scripts**
-   - For GRAB testing scripts, including [`scripts/val/predict_grab_rndseed.sh`](./scripts/val/predict_grab_rndseed.sh), xxx, xxx, edit data and experimental path related arguments specified in those scripts to your corresponding paths where donwloaded data are saved. For instance, 
+   - For GRAB testing scripts, including [`scripts/val/predict_grab_rndseed.sh`](./scripts/val/predict_grab_rndseed.sh), [`scripts/val/predict_grab_rndseed_spatial.sh`](./scripts/val/predict_grab_rndseed_spatial.sh), and [`scripts/val/reconstruct_grab.sh`](./scripts/val/reconstruct_grab.sh), please edit the data and experimental path-related arguments specified in those scripts to correspond to the paths where the downloaded data is saved. For instance, 
    ```bash
       ################# [Edit here] Set to your paths #################
       #### Data and exp folders ####
@@ -130,16 +141,18 @@ Follow steps below to reproduce the above result.
    bash scripts/val/predict_grab_rndseed_spatial.sh
    ```
 3. **Mesh reconstruction**
-   Script [`scripts/val/reconstruct_grab.sh`](./scripts/val/reconstruct_grab.sh) can reconstruct a single sequence, which is what the argument `single_seq_path` points to. Set the `single_seq_path` and the test tag in the script and run it:
+   To utilize the script [`scripts/val/reconstruct_grab.sh`](./scripts/val/reconstruct_grab.sh) to reconstruct a single sequence, you need to set the `single_seq_path` and the `test_tag` in the script before running it.
    ```bash
    bash scripts/val/reconstruct_grab.sh
    ```
 
 **Denoising a full sequence**
 
-The above evaluation setting on GRAB denoises the first 60 frames of a sequence. A full sequence can be cleaned first cutting the inpput into several overlapped clips, each with 60 frames, cleaning them independently, followed by reconstructing the mesh sequence together. 
 
-Taking `data/grab/source_data/14.npy` as an example. The following scripts will add artificual Gaussian noise onto it and denoising the full sequence: 
+The evaluation setting for GRAB denoises the first 60 frames of a sequence. To denoise a full sequence, the input can be divided into several overlapping clips, each containing 60 frames. These clips can then be cleaned independently, followed by reconstructing the mesh sequence together.
+
+For example, taking `data/grab/source_data/14.npy`, the following scripts will add artificial Gaussian noise to it and denoise the full sequence:
+
 ```bash
 ##### Denoising #####
 bash scripts/val/predict_grab_fullseq_rndseed.sh
@@ -149,7 +162,7 @@ bash scripts/val/predict_grab_fullseq_rndseed_spatial.sh
 bash scripts/val/reconstruct_grab_fullseq.sh
 ```
 
-`single_seq_path` in each script controls which sequence to operatet on. 
+The `single_seq_path` parameter in each script specifies the sequence to denoise. 
 
 
 
@@ -159,9 +172,8 @@ bash scripts/val/reconstruct_grab_fullseq.sh
 
 **Example**
 
-> An example of cleaning an input trajectory (sequence 14 of GRAB's test split) with noise sampled from a Beta distribution.
 
-Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The input sequence and two different samples are shown as below. 
+The input noisy trajectory is constructed by adding noise from a Beta distirbution onto the trajectory `data/grab/source_data/14.npy`. And two different denoised samples are shown as below. 
 
 
 |        Input        |       Result 1         |         Result 2         |
@@ -169,27 +181,30 @@ Use the model to clean the noisy trajectory `data/grab/source_data/14.npy`. The 
 | ![](assets/grab-14-input-beta.gif) | ![](assets/grab-14-res-1-beta.gif) | ![](assets/grab-14-res-2-beta.gif) |
 
 
-Use scripts in `scripts/val_examples` for the GRAB example outlined in the previous section but changing the `pert_type` argument in each `.sh` file from `gaussian` to `beta` to reproduce the results. 
+To reproduce this result, use the scripts located in the `scripts/val_examples` directory. Please notice that the `pert_type` argument in each `.sh` file should be set to `beta`. 
 
 
 
 **Evaluate on the test split** 
 
 
-To run th evaluation process on all GRAB test sequences, follow the same steps as outlined in the previous section but change the `pert_type` argument in each `.sh` file from `gaussian` to `beta`. 
+To run th evaluation process on all GRAB test sequences, follow the same steps as outlined in the previous section. Please notice that the `pert_type` argument in each `.sh` file should be set to `beta`. 
 
 
 
 **Denoising a full sequence**
 
-Follow the same steps as outlined in the previous section but change the `pert_type` argument in each `.sh` file from `gaussian` to `beta`. 
+Follow the same steps as outlined in the previous section. Don't forget to set the `pert_type` argument in each `.sh` file should be set to `beta`. 
 
 
 
 
 ### TACO
 
-Use the model to clean the noisy trajectory `data/taco/source_data/20231104_017.pkl`. Input, result, and the overlayed video are shown as below.
+> Here's an example of cleaning an input noisy trajectory `data/taco/source_data/20231104_017.pkl`. 
+
+
+Below are the input, result, and overlayed video.
 
 
 |        Input        |       Result         |         Overlayed         |
@@ -197,23 +212,23 @@ Use the model to clean the noisy trajectory `data/taco/source_data/20231104_017.
 | ![](assets/taco-20231104_017-src.gif) | ![](assets/taco-20231104_017-res.gif) | ![](assets/taco-20231104_017-overlayed.gif) |
 
 
-Follow steps below to reproduce the above result. 
+To reproduce the above result, follow the steps below:
 
 1. **Denoising**
    ```bash
    bash scripts/val_examples/predict_taco_rndseed_spatial_20231104_017.sh
    ```
-   Ten random seeds will be utilizd for prediction. The predicted results will be saved in the folder `./data/taco/result`. 
+   Ten random seeds will be utilized for prediction, and the predicted results will be saved in the folder `./data/taco/result`.
 2. **Mesh reconstruction**
    ```bash
    bash scripts/val_examples/reconstruct_taco_20231104_017.sh
    ```
-   Results will be saved under the same folder with the above step. 
+   Results will be saved in the same folder as mentioned in the previous step.
 3. **Extracting results and visualization** 
    ```bash
    python visualize/vis_taco_example_20231104_017.py
    ```
-   Adjust camera pose in the viewer given the first frame. Then figures capturing all frames will be saved under the root folder of the project. Use your favorate tool to compose them together into a video. 
+   Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video.
    
 
 
@@ -231,11 +246,11 @@ Follow steps below to reproduce the above result.
 If you find this code useful in your research, please cite:
 
 ```bibtex
-@article{tevet2022human,
-  title={Human Motion Diffusion Model},
-  author={Tevet, Guy and Raab, Sigal and Gordon, Brian and Shafir, Yonatan and Bermano, Amit H and Cohen-Or, Daniel},
-  journal={arXiv preprint arXiv:2209.14916},
-  year={2022}
+@inproceedings{liu2024geneoh,
+   title={GeneOH Diffusion: Towards Generalizable Hand-Object Interaction Denoising via Denoising Diffusion},
+   author={Liu, Xueyi and Yi, Li},
+   booktitle={The Twelfth International Conference on Learning Representations},
+   year={2024}
 }
 ```
 

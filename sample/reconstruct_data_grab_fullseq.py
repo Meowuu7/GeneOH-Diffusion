@@ -2742,7 +2742,12 @@ if __name__=='__main__':
         print(f"data: {data.keys()}")
         ############ Merge data ############
         
+        merged_pred_sv_infos_sv_fn_nm = f"predicted_infos_sv_dict_seed_{seed}_tag_{test_tag}_multi_ntag_{len(st_idxes)}.npy"
+        # merged_pred_sv_infos_sv_fn = os.path.join(pred_infos_sv_folder, merged_pred_sv_infos_sv_fn_nm)
+        merged_pred_sv_infos_sv_fn = os.path.join(pred_infos_sv_folder, merged_pred_sv_infos_sv_fn_nm)
+        np.save(merged_pred_sv_infos_sv_fn, data)
         
+
         
         
         
@@ -2837,5 +2842,6 @@ if __name__=='__main__':
         optimized_sv_infos_sv_fn = os.path.join(pred_infos_sv_folder, optimized_sv_infos_sv_fn_nm)
         np.save(optimized_sv_infos_sv_fn, optimized_sv_infos)
         print(f"optimized infos saved to {optimized_sv_infos_sv_fn}")
+        print(f"merged predicted info saved to {merged_pred_sv_infos_sv_fn}")
         
 

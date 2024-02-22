@@ -166,7 +166,7 @@ def main():
     print(f"save_dir: {save_dir}, single_seq_path: {single_seq_path}")
     
     test_seeds = range(0, 122, 11)
-    test_seeds = range(0, 1)
+    # test_seeds = range(0, 1)
     
     for cur_seed in test_seeds:
     
@@ -278,8 +278,9 @@ def main():
                 cur_st_idxes = tot_st_idxes[i_b].item()
                 cur_ed_idxes = tot_ed_idxes[i_b].item()
                 cur_len_full_targets = len(full_targets)
-                for i_ins in range(cur_len_full_targets, cur_ed_idxes):
-                    cur_ins_rel_idx = i_ins - cur_ed_idxes # negative index here
+                # for i_ins in range(cur_len_full_targets, cur_ed_idxes):
+                for i_ins in range(cur_targets.size(0)):
+                    cur_ins_rel_idx = i_ins # - cur_ed_idxes # negative index here
                     cur_ins_targets = cur_targets[cur_ins_rel_idx] / data_scale_factor
                     print(f"cur_outputs: {cur_outputs.size()}")
                     cur_ins_outputs = cur_outputs[cur_ins_rel_idx] / data_scale_factor

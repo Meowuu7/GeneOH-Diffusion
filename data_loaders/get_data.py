@@ -52,20 +52,17 @@ def get_dataset_class(name, args=None):
             elif args.rep_type in ["obj_base_rel_dist_we", "obj_base_rel_dist_we_wj", "obj_base_rel_dist_we_wj_latents"]:
                 if args.use_arctic:
                     from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V19_ARCTIC as my_data
-                elif args.use_vox_data: # use vox data here #
+                elif args.use_vox_data:
                     from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V20 as my_data
-                elif args.use_predicted_infos: # train with predicted infos for test tim adaptation #
+                elif args.use_predicted_infos:
                     from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V21 as my_data
                 elif args.use_interpolated_infos:
-                    # GRAB_Dataset_V22
                     from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V22 as my_data
                 else:
                     from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V19 as my_data
             else:
                 from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V16 as my_data
             return my_data
-            # from data_loaders.humanml.data.dataset_ours import GRAB_Dataset_V16
-        # return GRAB_Dataset_V16
     else:
         raise ValueError(f'Unsupported dataset name [{name}]')
 
@@ -88,13 +85,6 @@ def get_collate_fn(name, hml_mode='train', args=None):
                 return motion_ours_singe_seq_collate
             else:
                 return motion_ours_collate
-        # if len(args.single_seq_path) > 0:
-        #     return motion_ours_singe_seq_collate
-        # else:
-        #     if args.rep_type == "obj_base_rel_dist":
-        #         return motion_ours_obj_base_rel_dist_collate
-        #     else:
-        #         return motion_ours_collate
     else:
         return all_collate
 

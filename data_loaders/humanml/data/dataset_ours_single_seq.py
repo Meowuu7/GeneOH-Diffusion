@@ -53,8 +53,8 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         
         
         
-        # self.start_idx = args.start_idx # clip starting idxes #
-        self.start_idx = 0
+        self.start_idx = args.start_idx # clip starting idxes #
+        # self.start_idx = 0
 
         # obj_mesh_path = "data/grab/object_meshes"
         obj_mesh_path = "data/grab/object_meshes"
@@ -1666,8 +1666,8 @@ class GRAB_Dataset_V19_From_Evaluated_Info(torch.utils.data.Dataset):
             'object_transl': object_transl_th,
             # 'st_idx': st_idx,
             # 'ed_idx': ed_idx,
-            'st_idx': 0,
-            'ed_idx': 0 + self.window_size,
+            'st_idx': start_idx,
+            'ed_idx': start_idx + self.window_size,
             'pert_verts': pert_rhand_verts,
             'verts': rhand_verts,
             'obj_verts': obj_verts,
