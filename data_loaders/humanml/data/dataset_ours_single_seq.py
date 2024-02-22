@@ -4839,9 +4839,4 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
           cur_len += 1
         cur_len = 1
         return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
-
-
-
 
