@@ -31,6 +31,7 @@ Create a virtual environment
 
 ```shell
 conda create -n geneoh-diffusion python==3.8.13
+conda activate geneoh-diffusion
 ```
 
 Install `torch2.2.0+cu121`
