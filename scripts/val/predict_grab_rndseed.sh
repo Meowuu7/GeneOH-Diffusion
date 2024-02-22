@@ -99,7 +99,6 @@ export in_eval=""
 export finetune_with_cond_rel=""
 export finetune_with_cond_jtsobj=""
 export sel_basepts_idx=-1
-export test_tag="jts_grab_t_400_test_beta_"
 export finetune_cond_obj_feats_dim=3
 export cad_model_fn=""
 export diff_joint_quants=""
@@ -124,12 +123,12 @@ export sigma_small="--sigma_small"
 export use_same_noise_for_rep=""
 export use_temporal_rep_v2=""
 export use_arti_obj=""
-export pert_type="beta"
 export use_anchors=""
 export with_glb_info=""
 export phy_guided_sampling=""
 export diff_hand_params=""
 export corr_fn=""
+export test_tag="jts_grab_t_400_test_beta_"
 export prev_test_tag=""
 export augment=""
 export train_all_clips=""
@@ -160,11 +159,16 @@ export window_size=60
 
 ################# Set to your paths #################
 #### Data and exp folders ####
-export seq_root="/data1/xueyi/GRAB_processed/test"
-export grab_path="/data1/xueyi/GRAB_extracted"
-export save_dir="/data2/xueyi/eval_save/GRAB"
-export grab_processed_dir="/data1/xueyi/GRAB_processed"
+export seq_root="data/grab/GRAB_processed/test"
+export grab_path="data/grab/GRAB_extracted"
+export save_dir="data/grab/eval_save"
+export grab_processed_dir="data/grab/GRAB_processed"
 
+
+################# Evaluation setting #################
+# set `pert_type` to `gaussian` to add Gaussian noise
+# set `pert_type` to `beta` to add noise from a beta distribution (GRAB (Beta) test set)`
+export pert_type="beta"
 
 
 ################# Set to your model path #################
@@ -175,5 +179,5 @@ export model_path="ckpts/model.pt"
 export cuda_ids=7
 
 
-# bash scripts/val/predict_grab_rndseed_test.sh
+# bash scripts/val/predict_grab_rndseed.sh
 CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.predict_grab_all_seq --dataset motion_ours --save_dir ${save_dir} --single_seq_path ${single_seq_path} --window_size ${window_size} ${unconstrained} ${inst_normalization}  --model_path ${model_path} --rep_type ${rep_type} --batch_size=${batch_size}  --denoising_stra ${denoising_stra} ${inter_optim} --seed ${seed} ${diff_jts} ${diff_basejtsrel} ${diff_basejtse}  ${use_sep_models} --jts_sclae_stra ${jts_sclae_stra} ${use_vae} ${use_sigmoid} ${train_enc} ${without_dec_pos_emb} ${pred_diff_noise} ${resume_diff} ${not_load_opt} ${deep_fuse_timeemb}  ${use_ours_transformer_enc} ${const_noise} ${set_attn_to_none} ${rnd_noise} ${wo_e_normalization} ${wo_rel_normalization} ${use_dec_rel_v2} ${pred_basejtsrel_avgjts} ${single_frame_noise} --use_t ${use_t} ${not_add_noise} ${not_cond_base}  ${not_pred_avg_jts} --latent_dim ${latent_dim} ${diff_spatial} --noise_schedule ${noise_schedule} ${pred_joints_offset}  ${not_diff_avgjts}  ${joint_std_v3}  ${joint_std_v2}  ${diff_latents}  ${use_canon_joints} ${use_var_sched} --e_normalization_stra ${e_normalization_stra} --real_basejtsrel_norm_stra ${real_basejtsrel_norm_stra} ${diff_realbasejtsrel}  ${diff_realbasejtsrel_to_joints} ${use_abs_jts_for_encoding} ${use_abs_jts_for_encoding_obj_base} ${use_abs_jts_pos} ${use_objbase_v2} ${use_objbase_out_v3} ${use_objbase_v4} ${use_objbase_out_v4} ${use_objbase_v5} ${use_objbase_out_v5} ${out_objbase_v5_bundle_out} --nn_base_pts ${nn_base_pts} ${add_noise_onjts} ${v5_out_not_cond_base} ${use_objbase_v6} ${add_noise_onjts_single} ${only_cmb_finger} ${use_objbase_v7} ${v5_in_not_base_pos} ${v5_in_not_base} ${v5_in_without_glb}  ${finetune_with_cond} --test_tag ${test_tag} ${finetune_with_cond_rel} ${finetune_with_cond_jtsobj} --sel_basepts_idx ${sel_basepts_idx} ${use_same_noise_for_rep} --pert_type ${pert_type} ${phy_guided_sampling} ${use_anchors} ${use_arti_obj} --theta_dim ${theta_dim} --start_idx ${start_idx} ${use_reverse} --scale_obj ${scale_obj} ${resplit} --seq_root=${seq_root} --grab_path=${grab_path} --grab_processed_dir=${grab_processed_dir}

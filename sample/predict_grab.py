@@ -137,7 +137,7 @@ def main():
     
     args_path = os.path.join(args.save_dir, 'args.json')
     with open(args_path, 'w') as fw:
-        json.dump(vars(args), fw, indent=4, sort_keys=True)
+        json.dump(vars(args), fw, indent=4, sort_keys=False)
     
     print(f"save_dir: {save_dir}, single_seq_path: {single_seq_path}")
     

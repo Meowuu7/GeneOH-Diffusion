@@ -165,8 +165,11 @@ def main():
     
     print(f"save_dir: {save_dir}, single_seq_path: {single_seq_path}")
     
-    for cur_seed in range(0, 122, 11):
-            
+    test_seeds = range(0, 122, 11)
+    test_seeds = range(0, 1)
+    
+    for cur_seed in test_seeds:
+    
         for st_fr in st_idxes:
             
             args.start_idx = st_fr

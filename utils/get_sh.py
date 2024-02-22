@@ -4,7 +4,7 @@ def get_sh_from_json(json_file):
     with open(json_file, 'r') as f:
         data = json.load(f)
         
-    test_sh_fn = "/home/xueyi/sim/GeneOH-Diffusion/data/grab/result/test_exported_sh.sh"
+    test_sh_fn = "data/grab/result/test_exported_sh.sh"
     wf = open(test_sh_fn, "w")
     for key in data:
         val = data[key]
@@ -26,5 +26,5 @@ def get_sh_from_json(json_file):
     
 
 if __name__=='__main__':
-    json_file = "/home/xueyi/sim/GeneOH-Diffusion/data/grab/result/args_spatial.json"
+    json_file = "data/grab/result/args_spatial.json"
     get_sh_from_json(json_file=json_file)

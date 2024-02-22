@@ -5422,29 +5422,11 @@ if __name__=='__main__':
   # for i_test_seq in range(st_idx, ed_idx):
   for i_test_seq in range(st_idx, ed_idx): # 
     for seed in tot_rnd_seeds:
-      # for seed in tot_rnd_seeds:
-      #   for i_test_seq in range(st_idx, ed_idx):
-        # /data2/xueyi/eval_save/HOI_Arti/Scissors/predicted_infos_seq_0_seed_0_tag_jts_hoi4d_arti_t_400_.npy
-      # pred_infos_sv_folder = "/home/xueyi/sim/motion-diffusion-model/save/my_humanml_trans_enc_512"
-      # /data1/xueyi/mdm/eval_save/predicted_infos_seq_1_seed_77_tag_rep_only_real_sel_base_mean_all_noise_.npy
-      # pred_infos_sv_folder = "/data1/xueyi/mdm/eval_save/"
+
       pred_joints_info_nm = "predicted_infos.npy"
-      
-      # /data1/xueyi/mdm/eval_save/predicted_infos_seq_7_seed_77_tag_jts_only.npy
-      # /data1/xueyi/mdm/eval_save/predicted_infos_seq_7_seed_77_tag_rep_only_real_mean_.npy
-      # /data1/xueyi/mdm/eval_save/predicted_infos_seq_7_seed_77_tag_rep_only_real_mean_same_noise_.npy
-      # predicted_infos_seq_12_seed_77_tag_rep_only_real_mean_same_noise_hoi4d_t_200_.npy
-      
-      # pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
+
       pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
-      
-      # pred_joints_info_nm = "predicted_infos_seq_1_seed_31_tag_rep_only_real_sel_base_0.npy"
-      # # /home/xueyi/sim/motion-diffusion-model/save/my_humanml_trans_enc_512/predicted_infos_seq_1_seed_31_tag_rep_only_real_sel_base_mean.npy
-      # pred_joints_info_nm = "predicted_infos_seq_1_seed_31_tag_rep_only_real_sel_base_mean.npy"
-      # # pred_infos_sv_folder = "/home/xueyi/sim/motion-diffusion-model/save/my_humanml_trans_enc_512/predicted_infos.npy"
-      # TODO: load the total data sequence and transform object shape using the loaded sample
-      # TODO: please output hands and objects other than hands only in each frame #
-      #### pred_infos_sv_folder ####
+
       pred_joints_info_fn = os.path.join(pred_infos_sv_folder, pred_joints_info_nm) #
       
       
@@ -5680,18 +5662,7 @@ if __name__=='__main__':
             }
           )
           
-          # pred_infos_sv_folder = "/data1/xueyi/mdm/eval_save/" ## optimized 
-          # pred_infos_sv_folder = f"/data2/xueyi/eval_save/HOI_Arti/{cat_nm}"
-
-          # pred_joints_info_nm = f"predicted_infos_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
-          # /data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_7_seed_77_tag_rep_only_real_mean_t_200_.npy
-          # optimized_infos_sv_dict_seq_12_seed_77_tag_rep_only_real_mean_same_noise_hoi4d_t_200_.npy
-          # optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wjts_0.01_reffr_11.npy"
-          # optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wjts_0.01_reffr_20.npy"
-          # optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wjts_0.01_reffr_20_jts_smooth_0005.npy"
-          # optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wjts_0.01_reffr_20_jts_smooth_05.npy"
-          # optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}_wjts_0.01_reffr_20_jts_pose_smooth_05.npy"
-          # optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}_dist_thres_{dist_thres}_with_proj_{with_proj}.npy"
+          
           optimized_sv_infos_sv_fn_nm = f"optimized_infos_sv_dict_seq_{i_test_seq}_seed_{seed}_tag_{test_tag}.npy"
           optimized_sv_infos_sv_fn = os.path.join(pred_infos_sv_folder, optimized_sv_infos_sv_fn_nm)
           np.save(optimized_sv_infos_sv_fn, optimized_sv_infos)

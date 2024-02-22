@@ -3,10 +3,14 @@
 
 ### [Project](https://meowuu7.github.io/GeneOH-Diffusion/) | [Gradio Demo](https://huggingface.co/spaces/xymeow7/gene-hoi-denoising) | [OpenReview](https://openreview.net/forum?id=FvK2noilxT)
 
-The PyTorch implementation of the paper [**"GeneOH Diffusion"**](https://arxiv.org/abs/2209.14916).
+The PyTorch implementation of the paper [**"GeneOH Diffusion"**](https://meowuu7.github.io/GeneOH-Diffusion/). 
 
 ![teaser](./assets/demo.gif)
 
+The repository contains 
+- Pre-trained models and example usage (on three datasets)
+- Evaluation process on two of our test datasets
+Tthe evaluation process on remaining test datasets and the training procedure will be added. 
 
 ## Getting started
 
@@ -50,7 +54,7 @@ pip install -e .
 cd ..
 ```
 
-**Note that the MANO layer we use is slightly different from the original official release. The `manopth` package should be install from this project otherwise the model would produce wierd denoised results**
+**Note that the MANO layer we use is slightly different from the original official release. The `manopth` package should be install from this project otherwise the model would produce wierd denoised results.**
 
 ### 2. Download pre-trained models
 
@@ -133,14 +137,19 @@ Follow steps below to reproduce the above result.
 
 **Denoising a full sequence**
 
+The above evaluation setting on GRAB denoises the first 60 frames of a sequence. A full sequence can be cleaned first cutting the inpput into several overlapped clips, each with 60 frames, cleaning them independently, followed by reconstructing the mesh sequence together. 
 
+Taking `data/grab/source_data/14.npy` as an example. The following scripts will add artificual Gaussian noise onto it and denoising the full sequence: 
+```bash
+##### Denoising #####
+bash scripts/val/predict_grab_fullseq_rndseed.sh
+##### Denoising #####
+bash scripts/val/predict_grab_fullseq_rndseed_spatial.sh
+##### Reconstructing #####
+bash scripts/val/reconstruct_grab_fullseq.sh
+```
 
-full evals
-- preprocessed data 
-- reconstruction pipelines
-- full sequence processing file
-- full sequence processing pipeline
-
+`single_seq_path` in each script controls which sequence to operatet on. 
 
 
 
@@ -171,7 +180,9 @@ To run th evaluation process on all GRAB test sequences, follow the same steps a
 
 
 
+**Denoising a full sequence**
 
+Follow the same steps as outlined in the previous section but change the `pert_type` argument in each `.sh` file from `gaussian` to `beta`. 
 
 
 
@@ -206,12 +217,14 @@ Follow steps below to reproduce the above result.
    
 
 
-
-
 ## TODOs
+- [x] Example usage, evaluation process and pre-trained models
+- [ ] Evaluation process on HOI4D, ARCTIC
+- [ ] Data: HOI4D, ARCTIC, and more examples on TACO
+- [ ] Training procedure
+  
 
-- [ ] HOI4D, TACO
-- [ ] Training pipelines
+
 
 
 ## Bibtex

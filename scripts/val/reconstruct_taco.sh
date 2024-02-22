@@ -4,19 +4,19 @@ export cuda_ids=6
 
 
 
-export single_seq_path="/data3/hlyang/results/test_data/20231105/20231105_020.pkl"
-export test_tag="20231105_020_jts_spatial_t_100_hho_"
 
 
-export single_seq_path="/data3/hlyang/results/test_data/20231103/20231103_020.pkl"
+
+
+export single_seq_path="data/taco/source_data/20231104_017.pkl"
 export test_tag="20231103_020_jts_spatial_t_100_hho_"
 
 
-export save_dir="/data3/datasets/xueyi/hho_save_res"
+export save_dir="exp/taco/eval_save"
 
 
 
 
-# bash scripts/val/reconstruct_taco.sh --save_dir=./data/taco/result --single_seq_path=./data/taco/source_data/20231105_020.pkl
+# bash scripts/val/reconstruct_taco.sh
 CUDA_VISIBLE_DEVICES=${cuda_ids} python -m sample.reconstruct_data_taco --save_dir=${save_dir} --test_tag=${test_tag} --single_seq_path=${single_seq_path}
 

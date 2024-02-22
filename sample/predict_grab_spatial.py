@@ -140,11 +140,18 @@ def main():
     train_platform_type = eval(args.train_platform_type)
     train_platform = train_platform_type(args.save_dir)
     train_platform.report_args(args, name='Args') # train platform
-
-    args_path = os.path.join(args.save_dir, 'args.json')
+    
+    args_sv_folder = "data/grab/result"
+    args_path = os.path.join(args_sv_folder, 'args_spatial.json')
+    print(f"args saved to {args_path}")
     with open(args_path, 'w') as fw:
-        # json.dump(vars(args), fw, indent=4, sort_keys=True)
         json.dump(vars(args), fw, indent=4, sort_keys=False)
+    
+
+    # args_path = os.path.join(args.save_dir, 'args.json')
+    # with open(args_path, 'w') as fw:
+    #     # json.dump(vars(args), fw, indent=4, sort_keys=True)
+    #     json.dump(vars(args), fw, indent=4, sort_keys=False)
     
     for cur_seed in range(0, 122, 11):
         cur_single_seq_path = single_seq_path # os.path.join(seq_root, f"{test_seq_idx}.npy")

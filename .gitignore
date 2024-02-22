@@ -14,3 +14,14 @@ scripts/*/*_bak.sh
 __pycache__/
 
 */__pycache__
+
+
+scripts/*/*_local.sh
+
+# /home/xueyi/sim/GeneOH-Diffusion/sample/reconstruct_data_grab_all_seq.py
+sample/reconstruct_data_grab_all_seq.py
+
+# /home/xueyi/sim/GeneOH-Diffusion/sample/reconstruct_data_taco_all_seq.py
+sample/reconstruct_data_taco_all_seq.py
+
+sample/reconstruct_data.py

@@ -3,8 +3,6 @@ export PYTHONPATH=.
 
 
 
-
-
 export use_t=100
 export window_size=60
 export unconstrained="--unconstrained"
@@ -93,8 +91,7 @@ export use_arti_obj="--use_arti_obj"
 export diff_hand_params=""
 export diff_basejtsrel=""
 export diff_realbasejtsrel="--diff_realbasejtsrel"
-# export model_path=./ckpts/model000519000.pt 
-export model_path=/data1/xueyi/mdm/save/predoffset_stdscale_pred_diff_realbaesjtsrel_train_enc_with_diff_latents_prediffnoise_none_norm_rel_rel_to_jts_objbasev5in_objbasev5out_bundle_out_basepts700_innotcondbaseall_outnotcondbase_noisejtssingle_inwoglb_res_all_clips_aug_/model001039000.pt # 
+
 
 
 
@@ -107,16 +104,8 @@ export scale_obj=1
 
 
 
-export single_seq_path="/data3/hlyang/results/test_data/20231105/20231105_010.pkl"
-export test_tag="20231105_010_jts_spatial_t_100_hho_"
 
 
-export single_seq_path="/data3/hlyang/results/test_data/20231105/20231105_020.pkl"
-export test_tag="20231105_020_jts_spatial_t_100_hho_"
-
-
-export single_seq_path="/data3/hlyang/results/test_data/20231103/20231103_020.pkl"
-export test_tag="20231103_020_jts_spatial_t_100_hho_"
 
 
 export use_arctic=""
@@ -128,8 +117,14 @@ export use_reverse=""
 export seed=0
 
 
-export save_dir="/data3/datasets/xueyi/hho_save_res"
+export single_seq_path="data/taco/source_data/20231103_020.pkl"
+export test_tag="20231103_020_jts_spatial_t_100_hho_"
+export save_dir="exp/taco/eval_save"
 
+
+################# Set to your model path #################
+#### Model path ####
+export model_path="ckpts/model_spatial.pt"
 
 export cuda_ids=2
 

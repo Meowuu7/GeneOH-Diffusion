@@ -107,7 +107,7 @@ export scale_obj=1
 
 
 
-export single_seq_path=./data/taco/source_data/20231104_017.pkl
+export single_seq_path=data/taco/source_data/20231104_017.pkl
 export test_tag="20231104_017_jts_spatial_t_100_"
 
 
@@ -120,7 +120,7 @@ export use_reverse=""
 export seed=0
 
 
-export save_dir=./data/taco/result
+export save_dir=data/taco/result
 
 
 export cuda_ids=2
