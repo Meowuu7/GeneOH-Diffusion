@@ -147,6 +147,8 @@ def main():
     
     nn_st_skip = 30
     num_cleaning_frames = 60
+    
+    num_cleaning_frames = min(num_cleaning_frames, nn_frames)
     num_ending_clearning_frames = nn_frames - num_cleaning_frames + 1
 
     print(range(0, num_ending_clearning_frames, nn_st_skip))
@@ -176,10 +178,12 @@ def main():
             
             obj_mesh_fn = os.path.join(obj_sv_path, obj_name + ".obj") # object mesh file #
             print(f"loading from {obj_mesh_fn}") ## loading 
-            template_obj_vs, template_obj_fs = utils.read_obj_file_ours(obj_mesh_fn, sub_one=True)
-            template_obj_fs = np.array(template_obj_fs, dtype=np.long)
+            
+            # template_obj_vs, template_obj_fs = utils.read_obj_file_ours(obj_mesh_fn, sub_one=True)
+            # template_obj_fs = np.array(template_obj_fs, dtype=np.long)
             ## loaded the template obj
-            print(f"Current sequence path: {args.single_seq_path}, seed: {args.seed}; Template obj loaded with verts: {template_obj_vs.shape}, template_obj_fs: {template_obj_fs.shape}")
+            print(f"Current sequence path: {args.single_seq_path}, seed: {args.seed}; ")
+            # print(f"Template obj loaded with verts: {template_obj_vs.shape}, template_obj_fs: {template_obj_fs.shape}")
             
             ## get dataest loader ##
             ### ==== DATA LOADER ==== ### # DATA loade r##
@@ -310,7 +314,7 @@ def main():
                 'tot_obj_rot': tot_obj_rot.numpy(),  # ws x 3 x 3 #
                 'tot_obj_transl': tot_obj_transl.numpy(), # ws x 3 #
                 'tot_obj_pcs': tot_obj_pcs.detach().cpu().numpy(), 
-                'template_obj_fs': template_obj_fs,
+                # 'template_obj_fs': template_obj_fs,
             }
             
             

@@ -25,3 +25,8 @@ sample/reconstruct_data_grab_all_seq.py
 sample/reconstruct_data_taco_all_seq.py
 
 sample/reconstruct_data.py
+
+
+data/taco/source_data/test_laptop_hoi4d.pkl
+
+data/tmp

@@ -4110,6 +4110,9 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
         # start_idx = (index - c[0]) * self.step_size
         print(f"start_idx: {start_idx}, window_size: {self.window_size}")
+        
+        self.window_size = min(self.window_size, c['obj_pose'].shape[0] - start_idx)
+        
         # data = c[2][start_idx:start_idx+self.window_size]
         # # object_global_orient = self.data[index]['f5']
         # # object_transl = self.data[index]['f6'] #

@@ -45,7 +45,7 @@ def get_mano_model(ncomps=45, side='right', flat_hand_mean=False,):
     # ncomps = 45 # mano root #
     batch_size = 1
     mano_model = ManoLayer(
-        mano_root='mano/models', use_pca=True if ncomps == 15 else False, ncomps=ncomps, flat_hand_mean=flat_hand_mean, side=side, center_idx=0)
+        mano_root='manopth/mano/models', use_pca=True if ncomps == 15 else False, ncomps=ncomps, flat_hand_mean=flat_hand_mean, side=side, center_idx=0)
     return mano_model
 
 
@@ -211,6 +211,7 @@ def vis_predicted_joints_grab(predicted_info_fn, optimized_fn=None):
 
 if __name__=='__main__':
 
+    ws = 300
     ### configs ###
     tag = "jts_spatial_grab_t_200_test_"
     seq_idx = 14

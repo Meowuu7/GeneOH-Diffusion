@@ -1105,9 +1105,11 @@ if __name__=='__main__':
   nn_frames = data_hand_verts.shape[0] 
   nn_st_skip = 30
   num_cleaning_frames = 60
+  num_cleaning_frames = min(num_cleaning_frames, nn_frames)
+  
   num_ending_clearning_frames = nn_frames - num_cleaning_frames + 1
 
-
+  obj_faces = data_dict['obj_faces'][0]
 
   st_idxes = list(range(0, num_ending_clearning_frames, nn_st_skip))
   if st_idxes[-1] + num_cleaning_frames < nn_frames:
@@ -1227,7 +1229,10 @@ if __name__=='__main__':
     
     #### obj_verts_trans, obj_faces ####
     obj_verts_trans = np.matmul(obj_verts, tot_obj_rot) + tot_obj_transl.reshape(tot_obj_transl.shape[0], 1, tot_obj_transl.shape[1]) 
-    obj_faces = data['template_obj_fs']
+    if 'template_obj_fs' in data:
+      obj_faces = data['template_obj_fs']
+    else:
+      obj_faces = obj_faces  
     print(f"obj_verts_trans: {obj_verts_trans.shape}, obj_faces: {obj_faces.shape}")
     
 

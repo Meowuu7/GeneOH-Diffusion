@@ -1107,20 +1107,6 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
   nn_frames = joints.size(0)
   
   
-  # anchor_load_driver, masking_load_driver #
-  inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-  fvi, aw, _, _ = anchor_load_driver(inpath)
-  face_vertex_index = torch.from_numpy(fvi).long().cuda()
-  anchor_weight = torch.from_numpy(aw).float().cuda()
-  
-  anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-  palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-  hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-  # self.hand_palm_vertex_mask for hand palm mask #
-  hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool().cuda() ## the mask for hand palm to get hand anchors #
-      
-  
-  
 
   # initialize variables
   beta_var = torch.randn([1, 10]).cuda()
@@ -1394,256 +1380,256 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
   
   
   window_size = hand_verts.size(0)
-  if with_contact_opt:
-    num_iters = 2000
-    num_iters = 1000 # seq 77 # if with contact opt #
-    # num_iters = 500 # seq 77
-    ori_theta_var = theta_var.detach().clone()
+  # if with_contact_opt:
+  #   num_iters = 2000
+  #   num_iters = 1000 # seq 77 # if with contact opt #
+  #   # num_iters = 500 # seq 77
+  #   ori_theta_var = theta_var.detach().clone()
     
-    # tot_base_pts_trans # nf x nn_base_pts x 3
-    disp_base_pts_trans = tot_base_pts_trans[1:] - tot_base_pts_trans[:-1] # (nf - 1) x nn_base_pts x 3
-    disp_base_pts_trans = torch.cat( # nf x nn_base_pts x 3 
-      [disp_base_pts_trans, disp_base_pts_trans[-1:]], dim=0
-    )
+  #   # tot_base_pts_trans # nf x nn_base_pts x 3
+  #   disp_base_pts_trans = tot_base_pts_trans[1:] - tot_base_pts_trans[:-1] # (nf - 1) x nn_base_pts x 3
+  #   disp_base_pts_trans = torch.cat( # nf x nn_base_pts x 3 
+  #     [disp_base_pts_trans, disp_base_pts_trans[-1:]], dim=0
+  #   )
     
-    rhand_anchors = recover_anchor_batch(hand_verts.detach(), face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
+  #   rhand_anchors = recover_anchor_batch(hand_verts.detach(), face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
 
-    dist_joints_to_base_pts = torch.sum(
-      (rhand_anchors.unsqueeze(-2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nnjoints x nnbasepts #
-    )
+  #   dist_joints_to_base_pts = torch.sum(
+  #     (rhand_anchors.unsqueeze(-2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nnjoints x nnbasepts #
+  #   )
     
-    nn_base_pts = dist_joints_to_base_pts.size(-1)
-    nn_joints = dist_joints_to_base_pts.size(1)
+  #   nn_base_pts = dist_joints_to_base_pts.size(-1)
+  #   nn_joints = dist_joints_to_base_pts.size(1)
     
-    dist_joints_to_base_pts = torch.sqrt(dist_joints_to_base_pts) # nf x nnjoints x nnbasepts #
-    minn_dist, minn_dist_idx = torch.min(dist_joints_to_base_pts, dim=-1) # nf x nnjoints #
+  #   dist_joints_to_base_pts = torch.sqrt(dist_joints_to_base_pts) # nf x nnjoints x nnbasepts #
+  #   minn_dist, minn_dist_idx = torch.min(dist_joints_to_base_pts, dim=-1) # nf x nnjoints #
     
-    nk_contact_pts = 2
-    minn_dist[:, :-5] = 1e9
-    # minn_topk_dist, minn_topk_idx = torch.topk(minn_dist, k=nk_contact_pts, largest=False) # 
-    # joints_idx_rng_exp = torch.arange(nn_joints).unsqueeze(0).cuda() == 
-    # minn_topk_mask = torch.zeros_like(minn_dist)
-    # minn_topk_mask[minn_topk_idx] = 1. # nf x nnjoints #
-    # minn_topk_mask[:, -5: -3] = 1.
-    basepts_idx_range = torch.arange(nn_base_pts).unsqueeze(0).unsqueeze(0).cuda()
-    minn_dist_mask = basepts_idx_range == minn_dist_idx.unsqueeze(-1) # nf x nnjoints x nnbasepts
-    # for seq 101
-    # minn_dist_mask[31:, -5, :] = minn_dist_mask[30: 31, -5, :]
-    minn_dist_mask = minn_dist_mask.float()
+  #   nk_contact_pts = 2
+  #   minn_dist[:, :-5] = 1e9
+  #   # minn_topk_dist, minn_topk_idx = torch.topk(minn_dist, k=nk_contact_pts, largest=False) # 
+  #   # joints_idx_rng_exp = torch.arange(nn_joints).unsqueeze(0).cuda() == 
+  #   # minn_topk_mask = torch.zeros_like(minn_dist)
+  #   # minn_topk_mask[minn_topk_idx] = 1. # nf x nnjoints #
+  #   # minn_topk_mask[:, -5: -3] = 1.
+  #   basepts_idx_range = torch.arange(nn_base_pts).unsqueeze(0).unsqueeze(0).cuda()
+  #   minn_dist_mask = basepts_idx_range == minn_dist_idx.unsqueeze(-1) # nf x nnjoints x nnbasepts
+  #   # for seq 101
+  #   # minn_dist_mask[31:, -5, :] = minn_dist_mask[30: 31, -5, :]
+  #   minn_dist_mask = minn_dist_mask.float()
     
-    # 
-    # for seq 47
-    if cat_nm in ["Scissors"]:
-      # minn_dist_mask[:] = minn_dist_mask[11:12, :, :]
-      # minn_dist_mask[:11] = False
+  #   # 
+  #   # for seq 47
+  #   if cat_nm in ["Scissors"]:
+  #     # minn_dist_mask[:] = minn_dist_mask[11:12, :, :]
+  #     # minn_dist_mask[:11] = False
 
-      # if i_test_seq == 24:
-      #   minn_dist_mask[20:] = minn_dist_mask[20:21, :, :]
-      # else:
+  #     # if i_test_seq == 24:
+  #     #   minn_dist_mask[20:] = minn_dist_mask[20:21, :, :]
+  #     # else:
 
-      # minn_dist_mask[:] = minn_dist_mask[11:12, :, :]
-      minn_dist_mask[:] = minn_dist_mask[20:21, :, :]
+  #     # minn_dist_mask[:] = minn_dist_mask[11:12, :, :]
+  #     minn_dist_mask[:] = minn_dist_mask[20:21, :, :]
     
-    attraction_mask_new = (tot_base_pts_trans_disp_mask.float().unsqueeze(-1).unsqueeze(-1) + minn_dist_mask.float()) > 1.5
-    
-    
-    
-    # joints: nf x nn_jts_pts x 3; nf x nn_base_pts x 3 
-    dist_joints_to_base_pts_trans = torch.sum(
-      (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nn_jts_pts x nn_base_pts
-    )
-    minn_dist_joints_to_base_pts, minn_dist_idxes = torch.min(dist_joints_to_base_pts_trans, dim=-1) # nf x nn_jts_pts # nf x nn_jts_pts # 
-    nearest_base_normals = model_util.batched_index_select_ours(tot_base_normals_trans, indices=minn_dist_idxes, dim=1) # nf x nn_base_pts x 3 --> nf x nn_jts_pts x 3 # # nf x nn_jts_pts x 3 #
-    nearest_base_pts_trans = model_util.batched_index_select_ours(disp_base_pts_trans, indices=minn_dist_idxes, dim=1) # nf x nn_jts_ts x 3 #
-    dot_nearest_base_normals_trans = torch.sum(
-      nearest_base_normals * nearest_base_pts_trans, dim=-1 # nf x nn_jts 
-    )
-    trans_normals_mask = dot_nearest_base_normals_trans < 0. # nf x nn_jts # nf x nn_jts #
-    nearest_dist = torch.sqrt(minn_dist_joints_to_base_pts)
-    
-    # dist_thres
-    nearest_dist_mask = nearest_dist < dist_thres # hoi seq
-    # nearest_dist_mask = nearest_dist < 0.005 # hoi seq
-    
-    # nearest_dist_mask = nearest_dist < 0.03 # hoi seq
-    # nearest_dist_mask = nearest_dist < 0.5 # hoi seq # seq 47
-    # nearest_dist_mask = nearest_dist < 0.1 # hoi seq # seq 47
+  #   attraction_mask_new = (tot_base_pts_trans_disp_mask.float().unsqueeze(-1).unsqueeze(-1) + minn_dist_mask.float()) > 1.5
     
     
     
-    # nearest_dist_mask = nearest_dist < 0.1
-    k_attr = 100.
-    joint_attraction_k = torch.exp(-1. * k_attr * nearest_dist)
-    attraction_mask_new_new = (attraction_mask_new.float() + trans_normals_mask.float().unsqueeze(-1) + nearest_dist_mask.float().unsqueeze(-1)) > 2.5
+  #   # joints: nf x nn_jts_pts x 3; nf x nn_base_pts x 3 
+  #   dist_joints_to_base_pts_trans = torch.sum(
+  #     (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nn_jts_pts x nn_base_pts
+  #   )
+  #   minn_dist_joints_to_base_pts, minn_dist_idxes = torch.min(dist_joints_to_base_pts_trans, dim=-1) # nf x nn_jts_pts # nf x nn_jts_pts # 
+  #   nearest_base_normals = model_util.batched_index_select_ours(tot_base_normals_trans, indices=minn_dist_idxes, dim=1) # nf x nn_base_pts x 3 --> nf x nn_jts_pts x 3 # # nf x nn_jts_pts x 3 #
+  #   nearest_base_pts_trans = model_util.batched_index_select_ours(disp_base_pts_trans, indices=minn_dist_idxes, dim=1) # nf x nn_jts_ts x 3 #
+  #   dot_nearest_base_normals_trans = torch.sum(
+  #     nearest_base_normals * nearest_base_pts_trans, dim=-1 # nf x nn_jts 
+  #   )
+  #   trans_normals_mask = dot_nearest_base_normals_trans < 0. # nf x nn_jts # nf x nn_jts #
+  #   nearest_dist = torch.sqrt(minn_dist_joints_to_base_pts)
     
-    # if cat_nm in ["ToyCar", "Pliers", "Bottle", "Mug", "Scissors"]:
-    anchor_masks = [2, 3, 4, 9, 10, 11, 15, 16, 17, 22, 23, 24, 29, 30, 31]
-    anchor_nmasks = [iid for iid in range(attraction_mask_new_new.size(1)) if iid not in anchor_masks]
-    anchor_nmasks = torch.tensor(anchor_nmasks, dtype=torch.long).cuda()
-    attraction_mask_new_new[:, anchor_nmasks, :] = False # scissors 
+  #   # dist_thres
+  #   nearest_dist_mask = nearest_dist < dist_thres # hoi seq
+  #   # nearest_dist_mask = nearest_dist < 0.005 # hoi seq
     
-    # # for seq 47
-    # elif cat_nm in ["Scissors"]:
-    #   anchor_masks = [2, 3, 4, 15, 16, 17, 22, 23, 24]
-    #   anchor_nmasks = [iid for iid in range(attraction_mask_new_new.size(1)) if iid not in anchor_masks]
-    #   anchor_nmasks = torch.tensor(anchor_nmasks, dtype=torch.long).cuda()
-    #   attraction_mask_new_new[:, anchor_nmasks, :] = False
-    
-    # anchor_masks = torch.array([2, 3, 4, 15, 16, 17, 22, 23, 24], dtype=torch.long).cuda()
-    # anchor_masks = torch.arange(attraction_mask_new_new.size(1)).unsqueeze(0).unsqueeze(-1).cuda() != 
-    
-    # [2, 3, 4]
-    # [9, 10, 11]
-    # [15, 16, 17]
-    # [22, 23, 24]
-    # seq 47: [2, 3, 4, 15, 16, 17, 22, 23, 24]
-    # motion planning?  # 
+  #   # nearest_dist_mask = nearest_dist < 0.03 # hoi seq
+  #   # nearest_dist_mask = nearest_dist < 0.5 # hoi seq # seq 47
+  #   # nearest_dist_mask = nearest_dist < 0.1 # hoi seq # seq 47
     
     
-    transl_var_ori = transl_var.clone().detach()
-    # transl_var, theta_var, rot_var, beta_var # 
-    # opt = optim.Adam([rot_var, transl_var, theta_var], lr=learning_rate)
-    # opt = optim.Adam([transl_var, theta_var], lr=learning_rate)
-    opt = optim.Adam([transl_var, theta_var, rot_var], lr=learning_rate)
-    # opt = optim.Adam([theta_var, rot_var], lr=learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
-    for i in range(num_iters):
-        opt.zero_grad()
-        # mano_layer
-        hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
-            beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
-        hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
-        hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
+    
+  #   # nearest_dist_mask = nearest_dist < 0.1
+  #   k_attr = 100.
+  #   joint_attraction_k = torch.exp(-1. * k_attr * nearest_dist)
+  #   attraction_mask_new_new = (attraction_mask_new.float() + trans_normals_mask.float().unsqueeze(-1) + nearest_dist_mask.float().unsqueeze(-1)) > 2.5
+    
+  #   # if cat_nm in ["ToyCar", "Pliers", "Bottle", "Mug", "Scissors"]:
+  #   anchor_masks = [2, 3, 4, 9, 10, 11, 15, 16, 17, 22, 23, 24, 29, 30, 31]
+  #   anchor_nmasks = [iid for iid in range(attraction_mask_new_new.size(1)) if iid not in anchor_masks]
+  #   anchor_nmasks = torch.tensor(anchor_nmasks, dtype=torch.long).cuda()
+  #   attraction_mask_new_new[:, anchor_nmasks, :] = False # scissors 
+    
+  #   # # for seq 47
+  #   # elif cat_nm in ["Scissors"]:
+  #   #   anchor_masks = [2, 3, 4, 15, 16, 17, 22, 23, 24]
+  #   #   anchor_nmasks = [iid for iid in range(attraction_mask_new_new.size(1)) if iid not in anchor_masks]
+  #   #   anchor_nmasks = torch.tensor(anchor_nmasks, dtype=torch.long).cuda()
+  #   #   attraction_mask_new_new[:, anchor_nmasks, :] = False
+    
+  #   # anchor_masks = torch.array([2, 3, 4, 15, 16, 17, 22, 23, 24], dtype=torch.long).cuda()
+  #   # anchor_masks = torch.arange(attraction_mask_new_new.size(1)).unsqueeze(0).unsqueeze(-1).cuda() != 
+    
+  #   # [2, 3, 4]
+  #   # [9, 10, 11]
+  #   # [15, 16, 17]
+  #   # [22, 23, 24]
+  #   # seq 47: [2, 3, 4, 15, 16, 17, 22, 23, 24]
+  #   # motion planning?  # 
+    
+    
+  #   transl_var_ori = transl_var.clone().detach()
+  #   # transl_var, theta_var, rot_var, beta_var # 
+  #   # opt = optim.Adam([rot_var, transl_var, theta_var], lr=learning_rate)
+  #   # opt = optim.Adam([transl_var, theta_var], lr=learning_rate)
+  #   opt = optim.Adam([transl_var, theta_var, rot_var], lr=learning_rate)
+  #   # opt = optim.Adam([theta_var, rot_var], lr=learning_rate)
+  #   scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
+  #   for i in range(num_iters):
+  #       opt.zero_grad()
+  #       # mano_layer
+  #       hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
+  #           beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
+  #       hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
+  #       hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
         
-        joints_pred_loss = torch.sum(
-          (hand_joints - joints) ** 2, dim=-1
-        ).mean()
+  #       joints_pred_loss = torch.sum(
+  #         (hand_joints - joints) ** 2, dim=-1
+  #       ).mean()
         
-        # 
-        rhand_anchors = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
+  #       # 
+  #       rhand_anchors = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
 
         
-        # dist_joints_to_base_pts_sqr = torch.sum(
-        #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
-        # ) # nf x nnb x 3 ---- nf x nnj x 1 x 3 
-        dist_joints_to_base_pts_sqr = torch.sum(
-            (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1
-        )
-        # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
-        attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
-        # attaction_loss = attaction_loss
-        # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
+  #       # dist_joints_to_base_pts_sqr = torch.sum(
+  #       #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
+  #       # ) # nf x nnb x 3 ---- nf x nnj x 1 x 3 
+  #       dist_joints_to_base_pts_sqr = torch.sum(
+  #           (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1
+  #       )
+  #       # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
+  #       attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
+  #       # attaction_loss = attaction_loss
+  #       # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
         
-        # attaction_loss = torch.mean(attaction_loss * attraction_mask)
-        # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+  #       # attaction_loss = torch.mean(attaction_loss * attraction_mask)
+  #       # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
         
-        # seq 80
-        # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+  #       # seq 80
+  #       # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
         
-        # seq 70
-        # attaction_loss = torch.mean(attaction_loss[10:, -5:-3, :] * minn_dist_mask[10:, -5:-3, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+  #       # seq 70
+  #       # attaction_loss = torch.mean(attaction_loss[10:, -5:-3, :] * minn_dist_mask[10:, -5:-3, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
         
-        # new version relying on new mask #
-        # attaction_loss = torch.mean(attaction_loss[:, -5:-3, :] * attraction_mask_new[:, -5:-3, :])
-        ### original version ###
-        # attaction_loss = torch.mean(attaction_loss[20:, -3:, :] * attraction_mask_new[20:, -3:, :])
+  #       # new version relying on new mask #
+  #       # attaction_loss = torch.mean(attaction_loss[:, -5:-3, :] * attraction_mask_new[:, -5:-3, :])
+  #       ### original version ###
+  #       # attaction_loss = torch.mean(attaction_loss[20:, -3:, :] * attraction_mask_new[20:, -3:, :])
         
-        # attaction_loss = torch.mean(attaction_loss[:, -5:, :] * attraction_mask_new_new[:, -5:, :] * joint_attraction_k[:, -5:].unsqueeze(-1))
-        
-        
-        
-        attaction_loss = torch.mean(attaction_loss[:, :, :] * attraction_mask_new_new[:, :, :] * joint_attraction_k[:, :].unsqueeze(-1))
+  #       # attaction_loss = torch.mean(attaction_loss[:, -5:, :] * attraction_mask_new_new[:, -5:, :] * joint_attraction_k[:, -5:].unsqueeze(-1))
         
         
-        # seq mug
-        # attaction_loss = torch.mean(attaction_loss[4:, -5:-4, :] * minn_dist_mask[4:, -5:-4, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+        
+  #       attaction_loss = torch.mean(attaction_loss[:, :, :] * attraction_mask_new_new[:, :, :] * joint_attraction_k[:, :].unsqueeze(-1))
         
         
-        # opt.zero_grad()
-        pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
-        # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
-        shape_prior_loss = torch.mean(beta_var**2)
-        pose_prior_loss = torch.mean(theta_var**2)
-        joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
-        # =0.05
-        # # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
-        # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
+  #       # seq mug
+  #       # attaction_loss = torch.mean(attaction_loss[4:, -5:-4, :] * minn_dist_mask[4:, -5:-4, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
         
-        # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
         
-        # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
+  #       # opt.zero_grad()
+  #       pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
+  #       # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
+  #       shape_prior_loss = torch.mean(beta_var**2)
+  #       pose_prior_loss = torch.mean(theta_var**2)
+  #       joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
+  #       # =0.05
+  #       # # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
+  #       # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
         
-        theta_smoothness_loss = F.mse_loss(theta_var, ori_theta_var)
+  #       # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
+        
+  #       # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
+        
+  #       theta_smoothness_loss = F.mse_loss(theta_var, ori_theta_var)
 
-        transl_smoothness_loss = F.mse_loss(transl_var_ori, transl_var)
-        # loss = attaction_loss * 1000. + theta_smoothness_loss * 0.00001
+  #       transl_smoothness_loss = F.mse_loss(transl_var_ori, transl_var)
+  #       # loss = attaction_loss * 1000. + theta_smoothness_loss * 0.00001
         
-        # attraction loss, joint prediction loss, joints smoothness loss #
-        # loss = attaction_loss * 1000. + joints_pred_loss 
-        ### general ###
-        # loss = attaction_loss * 1000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
+  #       # attraction loss, joint prediction loss, joints smoothness loss #
+  #       # loss = attaction_loss * 1000. + joints_pred_loss 
+  #       ### general ###
+  #       # loss = attaction_loss * 1000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
         
-        # tune for seq 140
-        loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
-        # ToyCar # 
-        loss = attaction_loss * 10000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
+  #       # tune for seq 140
+  #       loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
+  #       # ToyCar # 
+  #       loss = attaction_loss * 10000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
         
-        if cat_nm in ["Scissors"]:
-          # scissors and 
-          # if dist_thres < 0.05:
-          #   loss = transl_smoothness_loss * 0.5 + attaction_loss * 10000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5
-          # else:          
-          #   # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05
-          #   loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
-          #   # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
+  #       if cat_nm in ["Scissors"]:
+  #         # scissors and 
+  #         # if dist_thres < 0.05:
+  #         #   loss = transl_smoothness_loss * 0.5 + attaction_loss * 10000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5
+  #         # else:          
+  #         #   # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05
+  #         #   loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
+  #         #   # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
 
-          if dist_thres < 0.05:
-            # loss = transl_smoothness_loss * 0.5 + attaction_loss * 10000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5
-            # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5 
+  #         if dist_thres < 0.05:
+  #           # loss = transl_smoothness_loss * 0.5 + attaction_loss * 10000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5
+  #           # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5 
 
-            # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + pose_smoothness_loss * 0.0005 + joints_smoothness_loss * 0.5
+  #           # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + pose_smoothness_loss * 0.0005 + joints_smoothness_loss * 0.5
 
-            nearest_dist_shape, _ = torch.min(nearest_dist, dim=-1)
-            nearest_dist_shape_mask = nearest_dist_shape > 0.01
-            transl_smoothness_loss_v2 = torch.sum((transl_var_ori - transl_var) ** 2, dim=-1)
-            transl_smoothness_loss_v2 = torch.mean(transl_smoothness_loss_v2[nearest_dist_shape_mask])
-            loss = transl_smoothness_loss * 0.5 + attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5
+  #           nearest_dist_shape, _ = torch.min(nearest_dist, dim=-1)
+  #           nearest_dist_shape_mask = nearest_dist_shape > 0.01
+  #           transl_smoothness_loss_v2 = torch.sum((transl_var_ori - transl_var) ** 2, dim=-1)
+  #           transl_smoothness_loss_v2 = torch.mean(transl_smoothness_loss_v2[nearest_dist_shape_mask])
+  #           loss = transl_smoothness_loss * 0.5 + attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5
 
-          else:          
-            # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05
-            loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
+  #         else:          
+  #           # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05
+  #           loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
             
-            # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
+  #           # loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.005
            
-        # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
-        # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
+  #       # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
+  #       # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
         
-        # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
+  #       # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
         
-        # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
+  #       # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
         
-        # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
-        # loss = joints_pred_loss * 30 + attaction_loss * 0.001
+  #       # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
+  #       # loss = joints_pred_loss * 30 + attaction_loss * 0.001
         
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-        scheduler.step()
+  #       opt.zero_grad()
+  #       loss.backward()
+  #       opt.step()
+  #       scheduler.step()
         
-        print('Iter {}: {}'.format(i, loss.item()), flush=True)
-        print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
-        print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
-        print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
-        print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
-        print('\tAttraction Loss: {}'.format(attaction_loss.item()))
-        print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
-        # theta_smoothness_loss
-        print('\tTheta Smoothness Loss: {}'.format(theta_smoothness_loss.item()))
-        # transl_smoothness_loss
-        print('\tTransl Smoothness Loss: {}'.format(transl_smoothness_loss.item()))
+  #       print('Iter {}: {}'.format(i, loss.item()), flush=True)
+  #       print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
+  #       print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
+  #       print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
+  #       print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
+  #       print('\tAttraction Loss: {}'.format(attaction_loss.item()))
+  #       print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
+  #       # theta_smoothness_loss
+  #       print('\tTheta Smoothness Loss: {}'.format(theta_smoothness_loss.item()))
+  #       # transl_smoothness_loss
+  #       print('\tTransl Smoothness Loss: {}'.format(transl_smoothness_loss.item()))
   
-  rhand_anchors_np = rhand_anchors.detach().cpu().numpy()
-  np.save("out_anchors.npy", rhand_anchors_np)
+  # rhand_anchors_np = rhand_anchors.detach().cpu().numpy()
+  # np.save("out_anchors.npy", rhand_anchors_np)
   ### optimized dict before projection ###
   bf_proj_optimized_dict = {
     'bf_ctx_mask_verts': hand_verts.detach().cpu().numpy(),
@@ -1656,48 +1642,48 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
   
   
   
-  ### 
-  if with_ctx_mask:
-    tot_penetration_masks_bf_contact_opt_frame_nmask_np = tot_penetration_masks_bf_contact_opt_frame_nmask.detach().cpu().numpy()
-    hand_verts = hand_verts.detach()
-    hand_joints = hand_joints.detach()
-    rot_var = rot_var.detach()
-    theta_var = theta_var.detach()
-    beta_var = beta_var.detach()
-    transl_var = transl_var.detach()
-    hand_verts = hand_verts.detach()
+  # ### 
+  # if with_ctx_mask:
+  #   tot_penetration_masks_bf_contact_opt_frame_nmask_np = tot_penetration_masks_bf_contact_opt_frame_nmask.detach().cpu().numpy()
+  #   hand_verts = hand_verts.detach()
+  #   hand_joints = hand_joints.detach()
+  #   rot_var = rot_var.detach()
+  #   theta_var = theta_var.detach()
+  #   beta_var = beta_var.detach()
+  #   transl_var = transl_var.detach()
+  #   hand_verts = hand_verts.detach()
     
-    # tot_base_pts_trans_disp_mask ### total penetration masks  
-    tot_base_pts_trans_disp_mask_n = (1. - tot_base_pts_trans_disp_mask.float()) > 0.5 ### that object do not move
-    tot_penetration_masks_bf_contact_opt_frame_nmask = (tot_penetration_masks_bf_contact_opt_frame_nmask.float() + tot_base_pts_trans_disp_mask_n.float()) > 1.5
-    hand_verts[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_verts_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
-    hand_joints[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_joints_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
-    rot_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_rot_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
-    theta_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_theta_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
-    # beta_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_beta_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
-    transl_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_transl_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
+  #   # tot_base_pts_trans_disp_mask ### total penetration masks  
+  #   tot_base_pts_trans_disp_mask_n = (1. - tot_base_pts_trans_disp_mask.float()) > 0.5 ### that object do not move
+  #   tot_penetration_masks_bf_contact_opt_frame_nmask = (tot_penetration_masks_bf_contact_opt_frame_nmask.float() + tot_base_pts_trans_disp_mask_n.float()) > 1.5
+  #   hand_verts[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_verts_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
+  #   hand_joints[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_joints_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
+  #   rot_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_rot_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
+  #   theta_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_theta_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
+  #   # beta_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_beta_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
+  #   transl_var[tot_penetration_masks_bf_contact_opt_frame_nmask] = bf_ct_transl_var_th[tot_penetration_masks_bf_contact_opt_frame_nmask]
     
-    rot_var_tmp = torch.randn_like(rot_var)
-    theta_var_tmp = torch.randn_like(theta_var)
-    transl_var_tmp = torch.randn_like(transl_var)
+  #   rot_var_tmp = torch.randn_like(rot_var)
+  #   theta_var_tmp = torch.randn_like(theta_var)
+  #   transl_var_tmp = torch.randn_like(transl_var)
     
-    rot_var_tmp.data = rot_var.data.clone()
-    theta_var_tmp.data = theta_var.data.clone()
-    transl_var_tmp.data = transl_var.data.clone()
+  #   rot_var_tmp.data = rot_var.data.clone()
+  #   theta_var_tmp.data = theta_var.data.clone()
+  #   transl_var_tmp.data = transl_var.data.clone()
     
-    rot_var = torch.randn_like(rot_var)
-    theta_var = torch.randn_like(theta_var)
-    transl_var = torch.randn_like(transl_var)
+  #   rot_var = torch.randn_like(rot_var)
+  #   theta_var = torch.randn_like(theta_var)
+  #   transl_var = torch.randn_like(transl_var)
     
-    rot_var.data = rot_var_tmp.data.clone()
-    theta_var.data = theta_var_tmp.data.clone()
-    transl_var.data = transl_var_tmp.data.clone()
+  #   rot_var.data = rot_var_tmp.data.clone()
+  #   theta_var.data = theta_var_tmp.data.clone()
+  #   transl_var.data = transl_var_tmp.data.clone()
     
     
-    rot_var = rot_var.requires_grad_()
-    theta_var = theta_var.requires_grad_()
-    beta_var = beta_var.requires_grad_()
-    transl_var = transl_var.requires_grad_()
+  #   rot_var = rot_var.requires_grad_()
+  #   theta_var = theta_var.requires_grad_()
+  #   beta_var = beta_var.requires_grad_()
+  #   transl_var = transl_var.requires_grad_()
     
     
   
@@ -1719,142 +1705,142 @@ def get_optimized_hand_fr_joints_v4_anchors(joints, base_pts, tot_base_pts_trans
     'bf_proj_transl_var': bf_proj_transl_var,
   } )
 
-  if with_proj:
-    num_iters = 2000
-    num_iters = 1000 # seq 77 # if with contact opt #
-    # num_iters = 500 # seq 77
-    ori_theta_var = theta_var.detach().clone()
+  # if with_proj:
+  #   num_iters = 2000
+  #   num_iters = 1000 # seq 77 # if with contact opt #
+  #   # num_iters = 500 # seq 77
+  #   ori_theta_var = theta_var.detach().clone()
     
-    nearest_base_pts=None
-    nearest_base_normals=None
+  #   nearest_base_pts=None
+  #   nearest_base_normals=None
     
-    # obj_verts_trans, obj_faces
-    if cat_nm in ["Mug"]:
-      # tot_penetration_masks = None
-      tot_penetration_masks = get_penetration_masks(obj_verts_trans, obj_faces, hand_verts)
-    else:
-      tot_penetration_masks = get_penetration_masks(obj_verts_trans, obj_faces, hand_verts)
-    # tot_penetration_masks = None
+  #   # obj_verts_trans, obj_faces
+  #   if cat_nm in ["Mug"]:
+  #     # tot_penetration_masks = None
+  #     tot_penetration_masks = get_penetration_masks(obj_verts_trans, obj_faces, hand_verts)
+  #   else:
+  #     tot_penetration_masks = get_penetration_masks(obj_verts_trans, obj_faces, hand_verts)
+  #   # tot_penetration_masks = None
     
-    # opt = optim.Adam([rot_var, transl_var, theta_var], lr=learning_rate)
-    # opt = optim.Adam([transl_var, theta_var], lr=learning_rate)
-    opt = optim.Adam([transl_var, theta_var, rot_var], lr=learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
-    for i in range(num_iters):
-        opt.zero_grad()
-        # mano_layer
-        hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
-            beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
-        hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
-        hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
+  #   # opt = optim.Adam([rot_var, transl_var, theta_var], lr=learning_rate)
+  #   # opt = optim.Adam([transl_var, theta_var], lr=learning_rate)
+  #   opt = optim.Adam([transl_var, theta_var, rot_var], lr=learning_rate)
+  #   scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
+  #   for i in range(num_iters):
+  #       opt.zero_grad()
+  #       # mano_layer
+  #       hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
+  #           beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
+  #       hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
+  #       hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
         
-        # tot_base_pts_trans, tot_base_normals_trans #
-        # obj_verts_trans, obj_faces
-        proj_loss, nearest_base_pts, nearest_base_normals  = get_proj_losses(hand_verts, tot_base_pts_trans, tot_base_normals_trans, tot_penetration_masks, nearest_base_pts=nearest_base_pts, nearest_base_normals=nearest_base_normals)
+  #       # tot_base_pts_trans, tot_base_normals_trans #
+  #       # obj_verts_trans, obj_faces
+  #       proj_loss, nearest_base_pts, nearest_base_normals  = get_proj_losses(hand_verts, tot_base_pts_trans, tot_base_normals_trans, tot_penetration_masks, nearest_base_pts=nearest_base_pts, nearest_base_normals=nearest_base_normals)
         
-        # rhand_anchors = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
+  #       # rhand_anchors = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
 
 
-        # hand_joints = rhand_anchors
+  #       # hand_joints = rhand_anchors
         
-        joints_pred_loss = torch.sum(
-          (hand_joints - joints) ** 2, dim=-1
-        ).mean()
-        
-        
-        
-        
-        # # dist_joints_to_base_pts_sqr = torch.sum(
-        # #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
-        # # ) # nf x nnb x 3 ---- nf x nnj x 1 x 3 
-        # dist_joints_to_base_pts_sqr = torch.sum(
-        #     (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1
-        # )
-        # # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
-        # attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
-        # # attaction_loss = attaction_loss
-        # # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
-        
-        # # attaction_loss = torch.mean(attaction_loss * attraction_mask)
-        # # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        # # seq 80
-        # # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        # # seq 70
-        # # attaction_loss = torch.mean(attaction_loss[10:, -5:-3, :] * minn_dist_mask[10:, -5:-3, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        # # new version relying on new mask #
-        # # attaction_loss = torch.mean(attaction_loss[:, -5:-3, :] * attraction_mask_new[:, -5:-3, :])
-        # ### original version ###
-        # # attaction_loss = torch.mean(attaction_loss[20:, -3:, :] * attraction_mask_new[20:, -3:, :])
-        
-        # # attaction_loss = torch.mean(attaction_loss[:, -5:, :] * attraction_mask_new_new[:, -5:, :] * joint_attraction_k[:, -5:].unsqueeze(-1))
+  #       joints_pred_loss = torch.sum(
+  #         (hand_joints - joints) ** 2, dim=-1
+  #       ).mean()
         
         
         
-        # attaction_loss = torch.mean(attaction_loss[:, :, :] * attraction_mask_new_new[:, :, :] * joint_attraction_k[:, :].unsqueeze(-1))
+        
+  #       # # dist_joints_to_base_pts_sqr = torch.sum(
+  #       # #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
+  #       # # ) # nf x nnb x 3 ---- nf x nnj x 1 x 3 
+  #       # dist_joints_to_base_pts_sqr = torch.sum(
+  #       #     (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1
+  #       # )
+  #       # # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
+  #       # attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
+  #       # # attaction_loss = attaction_loss
+  #       # # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
+        
+  #       # # attaction_loss = torch.mean(attaction_loss * attraction_mask)
+  #       # # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+        
+  #       # # seq 80
+  #       # # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+        
+  #       # # seq 70
+  #       # # attaction_loss = torch.mean(attaction_loss[10:, -5:-3, :] * minn_dist_mask[10:, -5:-3, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+        
+  #       # # new version relying on new mask #
+  #       # # attaction_loss = torch.mean(attaction_loss[:, -5:-3, :] * attraction_mask_new[:, -5:-3, :])
+  #       # ### original version ###
+  #       # # attaction_loss = torch.mean(attaction_loss[20:, -3:, :] * attraction_mask_new[20:, -3:, :])
+        
+  #       # # attaction_loss = torch.mean(attaction_loss[:, -5:, :] * attraction_mask_new_new[:, -5:, :] * joint_attraction_k[:, -5:].unsqueeze(-1))
         
         
-        # seq mug
-        # attaction_loss = torch.mean(attaction_loss[4:, -5:-4, :] * minn_dist_mask[4:, -5:-4, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
+        
+  #       # attaction_loss = torch.mean(attaction_loss[:, :, :] * attraction_mask_new_new[:, :, :] * joint_attraction_k[:, :].unsqueeze(-1))
         
         
-        # opt.zero_grad()
-        pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
-        # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
-        shape_prior_loss = torch.mean(beta_var**2)
-        pose_prior_loss = torch.mean(theta_var**2)
-        joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
-        # =0.05
-        # # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
-        # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
+  #       # seq mug
+  #       # attaction_loss = torch.mean(attaction_loss[4:, -5:-4, :] * minn_dist_mask[4:, -5:-4, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
         
-        # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
         
-        # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
+  #       # opt.zero_grad()
+  #       pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
+  #       # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
+  #       shape_prior_loss = torch.mean(beta_var**2)
+  #       pose_prior_loss = torch.mean(theta_var**2)
+  #       joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
+  #       # =0.05
+  #       # # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
+  #       # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
         
-        theta_smoothness_loss = F.mse_loss(theta_var, ori_theta_var)
-        # loss = attaction_loss * 1000. + theta_smoothness_loss * 0.00001
+  #       # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
         
-        # attraction loss, joint prediction loss, joints smoothness loss #
-        # loss = attaction_loss * 1000. + joints_pred_loss 
-        ### general ###
-        # loss = attaction_loss * 1000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
+  #       # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
         
-        # tune for seq 140
-        # loss = proj_loss * 1. + joints_pred_loss * 0.05 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
-        loss = proj_loss * 1. + joints_pred_loss * 1.0 + joints_smoothness_loss * 0.5 
-        if cat_nm in ["Pliers"]:
-          #  loss = proj_loss * 1. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05 
-          loss = proj_loss * 1. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05 
+  #       theta_smoothness_loss = F.mse_loss(theta_var, ori_theta_var)
+  #       # loss = attaction_loss * 1000. + theta_smoothness_loss * 0.00001
+        
+  #       # attraction loss, joint prediction loss, joints smoothness loss #
+  #       # loss = attaction_loss * 1000. + joints_pred_loss 
+  #       ### general ###
+  #       # loss = attaction_loss * 1000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
+        
+  #       # tune for seq 140
+  #       # loss = proj_loss * 1. + joints_pred_loss * 0.05 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
+  #       loss = proj_loss * 1. + joints_pred_loss * 1.0 + joints_smoothness_loss * 0.5 
+  #       if cat_nm in ["Pliers"]:
+  #         #  loss = proj_loss * 1. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05 
+  #         loss = proj_loss * 1. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.05 
 
-        elif cat_nm in ["Bottle"]:
-          loss = proj_loss * 1. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.05 
-        # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
-        # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
+  #       elif cat_nm in ["Bottle"]:
+  #         loss = proj_loss * 1. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.05 
+  #       # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
+  #       # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
         
-        # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
+  #       # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
         
-        # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
+  #       # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
         
-        # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
-        # loss = joints_pred_loss * 30 + attaction_loss * 0.001
+  #       # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
+  #       # loss = joints_pred_loss * 30 + attaction_loss * 0.001
         
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-        scheduler.step()
+  #       opt.zero_grad()
+  #       loss.backward()
+  #       opt.step()
+  #       scheduler.step()
         
-        print('Iter {}: {}'.format(i, loss.item()), flush=True)
-        print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
-        print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
-        print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
-        print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
-        print('\tproj_loss Loss: {}'.format(proj_loss.item()))
-        print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
-        # theta_smoothness_loss
-        print('\tTheta Smoothness Loss: {}'.format(theta_smoothness_loss.item()))
+  #       print('Iter {}: {}'.format(i, loss.item()), flush=True)
+  #       print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
+  #       print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
+  #       print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
+  #       print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
+  #       print('\tproj_loss Loss: {}'.format(proj_loss.item()))
+  #       print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
+  #       # theta_smoothness_loss
+  #       print('\tTheta Smoothness Loss: {}'.format(theta_smoothness_loss.item()))
   
   ### ### verts and joints before contact opt ### ###
   # bf_ct_verts, bf_ct_joints #
@@ -2081,556 +2067,6 @@ def get_proj_losses(hand_verts, base_pts, base_normals, tot_penetration_masks, n
 
   return proj_loss, nearest_base_pts, nearest_base_normals
   
-def get_optimized_hand_fr_joints_v4_fr_anchors(joints, base_pts, tot_base_pts_trans, tot_base_normals_trans, with_contact_opt=False, with_proj=False):
-  joints = torch.from_numpy(joints).float().cuda()
-  base_pts = torch.from_numpy(base_pts).float().cuda()
-  
-  # tot_base_pts_trans, tot_base_normals_trans #
-  tot_base_pts_trans = torch.from_numpy(tot_base_pts_trans).float().cuda()
-  tot_base_normals_trans = torch.from_numpy(tot_base_normals_trans).float().cuda()
-  ### start optimization ###
-  # setup MANO layer
-  mano_path = "manopth/mano/models"
-  mano_layer = ManoLayer(
-      flat_hand_mean=True,
-      side='right',
-      mano_root=mano_path, # mano_root #
-      ncomps=24,
-      use_pca=True,
-      root_rot_mode='axisang',
-      joint_rot_mode='axisang'
-  ).cuda()
-
-  nn_frames = joints.size(0)
-  
-  window_size = nn_frames
-  
-  # anchor_load_driver, masking_load_driver #
-  inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-  fvi, aw, _, _ = anchor_load_driver(inpath)
-  face_vertex_index = torch.from_numpy(fvi).long().cuda()
-  anchor_weight = torch.from_numpy(aw).float().cuda()
-  
-  anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-  palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-  hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-  # self.hand_palm_vertex_mask for hand palm mask #
-  hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool().cuda() ## the mask for hand palm to get hand anchors #
-      
-  
-  
-
-  # initialize variables
-  beta_var = torch.randn([1, 10]).cuda()
-  # first 3 global orientation
-  rot_var = torch.randn([nn_frames, 3]).cuda()
-  theta_var = torch.randn([nn_frames, 24]).cuda()
-  transl_var = torch.randn([nn_frames, 3]).cuda()
-  
-  # transl_var = tot_rhand_transl.unsqueeze(0).repeat(args.num_init, 1, 1).contiguous().to(device).view(args.num_init * num_frames, 3).contiguous()
-  # ori_transl_var = transl_var.clone()
-  # rot_var = tot_rhand_glb_orient.unsqueeze(0).repeat(args.num_init, 1, 1).contiguous().to(device).view(args.num_init * num_frames, 3).contiguous()
-  
-  beta_var.requires_grad_()
-  rot_var.requires_grad_()
-  theta_var.requires_grad_()
-  transl_var.requires_grad_()
-  
-  learning_rate = 0.1
-  
-  # joints: nf x nnjoints x 3 #
-  # dist_joints_to_base_pts = torch.sum(
-  #   (joints.unsqueeze(-2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1 # nf x nnjoints x nnbasepts #
-  # )
-  
-  dist_joints_to_base_pts = torch.sum(
-    (joints.unsqueeze(-2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nnjoints x nnbasepts #
-  )
-  
-  nn_base_pts = dist_joints_to_base_pts.size(-1)
-  nn_joints = dist_joints_to_base_pts.size(1)
-  
-  dist_joints_to_base_pts = torch.sqrt(dist_joints_to_base_pts) # nf x nnjoints x nnbasepts #
-  minn_dist, minn_dist_idx = torch.min(dist_joints_to_base_pts, dim=-1) # nf x nnjoints #
-  
-  nk_contact_pts = 2
-  minn_dist[:, :-5] = 1e9
-  minn_topk_dist, minn_topk_idx = torch.topk(minn_dist, k=nk_contact_pts, largest=False) # 
-  # joints_idx_rng_exp = torch.arange(nn_joints).unsqueeze(0).cuda() == 
-  minn_topk_mask = torch.zeros_like(minn_dist)
-  # minn_topk_mask[minn_topk_idx] = 1. # nf x nnjoints #
-  minn_topk_mask[:, -5: -3] = 1.
-  basepts_idx_range = torch.arange(nn_base_pts).unsqueeze(0).unsqueeze(0).cuda()
-  minn_dist_mask = basepts_idx_range == minn_dist_idx.unsqueeze(-1) # nf x nnjoints x nnbasepts
-  # for seq 101
-  # minn_dist_mask[31:, -5, :] = minn_dist_mask[30: 31, -5, :]
-  minn_dist_mask = minn_dist_mask.float()
-  
-  ## tot base pts 
-  tot_base_pts_trans_disp = torch.sum(
-    (tot_base_pts_trans[1:, :, :] - tot_base_pts_trans[:-1, :, :]) ** 2, dim=-1 # (nf - 1) x nn_base_pts displacement 
-  )
-  tot_base_pts_trans_disp = torch.sqrt(tot_base_pts_trans_disp).mean(dim=-1) # (nf - 1)
-  # tot_base_pts_trans_disp_mov_thres = 1e-20
-  tot_base_pts_trans_disp_mov_thres = 3e-4
-  tot_base_pts_trans_disp_mask = tot_base_pts_trans_disp >= tot_base_pts_trans_disp_mov_thres
-  tot_base_pts_trans_disp_mask = torch.cat(
-    [tot_base_pts_trans_disp_mask, tot_base_pts_trans_disp_mask[-1:]], dim=0
-  )
-  
-  attraction_mask_new = (tot_base_pts_trans_disp_mask.float().unsqueeze(-1).unsqueeze(-1) + minn_dist_mask.float()) > 1.5
-  
-  
-  
-  minn_topk_mask = (minn_dist_mask + minn_topk_mask.float().unsqueeze(-1)) > 1.5
-  print(f"minn_dist_mask: {minn_dist_mask.size()}")
-  # s = 1.0
-  # affinity_scores = get_affinity_fr_dist(dist_joints_to_base_pts, s=s)
-
-  # opt = optim.Adam([rot_var, transl_var], lr=args.coarse_lr)
-
-
-  num_iters = 200
-  opt = optim.Adam([rot_var, transl_var], lr=learning_rate)
-  for i in range(num_iters): #
-      opt.zero_grad()
-      # mano_layer #
-      hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
-          beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
-      hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
-      # hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
-      
-      
-      hand_joints = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
-
-      
-      joints_pred_loss = torch.sum(
-        (hand_joints - joints) ** 2, dim=-1
-      ).mean()
-      
-      # opt.zero_grad()
-      pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[:, 1:], theta_var.view(nn_frames, -1)[:, :-1])
-      # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
-      shape_prior_loss = torch.mean(beta_var**2)
-      pose_prior_loss = torch.mean(theta_var**2)
-      
-      # pose_smoothness_loss = 
-      # =0.05
-      # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
-      
-      loss = joints_pred_loss * 30
-      loss = joints_pred_loss * 1000
-      
-      opt.zero_grad()
-      loss.backward()
-      opt.step()
-      
-      print('Iter {}: {}'.format(i, loss.item()), flush=True)
-      print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
-      print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
-      print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
-      print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
-  
-  # 
-  print(tot_base_pts_trans.size())
-  diff_base_pts_trans = torch.sum((tot_base_pts_trans[1:, :, :] - tot_base_pts_trans[:-1, :, :]) ** 2, dim=-1) # (nf - 1) x nn_base_pts
-  print(f"diff_base_pts_trans: {diff_base_pts_trans.size()}")
-  diff_base_pts_trans = diff_base_pts_trans.mean(dim=-1)
-  diff_base_pts_trans_threshold = 1e-20
-  diff_base_pts_trans_mask = diff_base_pts_trans > diff_base_pts_trans_threshold # (nf - 1) ### the mask of the tranformed base pts
-  diff_base_pts_trans_mask = diff_base_pts_trans_mask.float()
-  print(f"diff_base_pts_trans_mask: {diff_base_pts_trans_mask.size()}, diff_base_pts_trans: {diff_base_pts_trans.size()}")
-  diff_last_frame_mask = torch.tensor([0,], dtype=torch.float32).to(diff_base_pts_trans_mask.device) + diff_base_pts_trans_mask[-1]
-  diff_base_pts_trans_mask = torch.cat(
-    [diff_base_pts_trans_mask, diff_last_frame_mask], dim=0 # nf tensor
-  )
-  # attraction_mask = (diff_base_pts_trans_mask.unsqueeze(-1).unsqueeze(-1) + minn_topk_mask.float()) > 1.5
-  attraction_mask = minn_topk_mask.float()
-  attraction_mask = attraction_mask.float()
-  
-  # the direction of the normal vector and the moving direction of the object point -> whether the point should be selected
-  # the contact maps of the object should be like? #
-  # the direction of the normal vector and the moving direction 
-  # define the attraction loss's weight; and attract points to the object surface #
-  # 
-  # 
-  
-  num_iters = 2000
-  num_iters = 3000
-  # num_iters = 1000
-  learning_rate = 0.01
-  opt = optim.Adam([rot_var, transl_var, beta_var, theta_var], lr=learning_rate)
-  scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
-  for i in range(num_iters):
-      opt.zero_grad()
-      # mano_layer
-      hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
-          beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
-      hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
-      # hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
-      
-      hand_joints = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
-
-      
-      joints_pred_loss = torch.sum(
-        (hand_joints - joints) ** 2, dim=-1
-      ).mean()
-      
-      # dist_joints_to_base_pts_sqr = torch.sum(
-      #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
-      # )
-      # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
-      # attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
-      # # attaction_loss = attaction_loss
-      # # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
-      
-      # # attaction_loss = torch.mean(attaction_loss * attraction_mask)
-      # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :])
-      
-      
-      # opt.zero_grad()
-      pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
-      # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
-      shape_prior_loss = torch.mean(beta_var**2)
-      pose_prior_loss = torch.mean(theta_var**2)
-      joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
-      # =0.05
-      # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
-      loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
-      
-      loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
-      
-      loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
-      
-      # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
-      # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
-      
-      # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
-      
-      # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
-      
-      # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
-      # loss = joints_pred_loss * 30 + attaction_loss * 0.001
-      
-      opt.zero_grad()
-      loss.backward()
-      opt.step()
-      scheduler.step()
-      
-      print('Iter {}: {}'.format(i, loss.item()), flush=True)
-      print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
-      print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
-      print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
-      print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
-      # print('\tAttraction Loss: {}'.format(attaction_loss.item()))
-      print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
-      
-  ### ### verts and joints before contact opt ### ###
-  # bf_ct_verts, bf_ct_joints #
-  bf_ct_verts = hand_verts.detach().cpu().numpy()
-  bf_ct_joints = hand_joints.detach().cpu().numpy()
-  
-  
-  window_size = hand_verts.size(0)
-  
-  if with_contact_opt:
-    num_iters = 2000
-    num_iters = 1000 # seq 77 # if with contact opt #
-    # num_iters = 500 # seq 77
-    ori_theta_var = theta_var.detach().clone()
-    
-    # tot_base_pts_trans # nf x nn_base_pts x 3
-    disp_base_pts_trans = tot_base_pts_trans[1:] - tot_base_pts_trans[:-1] # (nf - 1) x nn_base_pts x 3
-    disp_base_pts_trans = torch.cat( # nf x nn_base_pts x 3 
-      [disp_base_pts_trans, disp_base_pts_trans[-1:]], dim=0
-    )
-    
-    rhand_anchors = recover_anchor_batch(hand_verts.detach(), face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
-
-    dist_joints_to_base_pts = torch.sum(
-      (rhand_anchors.unsqueeze(-2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nnjoints x nnbasepts #
-    )
-    
-    nn_base_pts = dist_joints_to_base_pts.size(-1)
-    nn_joints = dist_joints_to_base_pts.size(1)
-    
-    dist_joints_to_base_pts = torch.sqrt(dist_joints_to_base_pts) # nf x nnjoints x nnbasepts #
-    minn_dist, minn_dist_idx = torch.min(dist_joints_to_base_pts, dim=-1) # nf x nnjoints #
-    
-    nk_contact_pts = 2
-    minn_dist[:, :-5] = 1e9
-    # minn_topk_dist, minn_topk_idx = torch.topk(minn_dist, k=nk_contact_pts, largest=False) # 
-    # joints_idx_rng_exp = torch.arange(nn_joints).unsqueeze(0).cuda() == 
-    # minn_topk_mask = torch.zeros_like(minn_dist)
-    # minn_topk_mask[minn_topk_idx] = 1. # nf x nnjoints #
-    # minn_topk_mask[:, -5: -3] = 1.
-    basepts_idx_range = torch.arange(nn_base_pts).unsqueeze(0).unsqueeze(0).cuda()
-    minn_dist_mask = basepts_idx_range == minn_dist_idx.unsqueeze(-1) # nf x nnjoints x nnbasepts
-    # for seq 101
-    # minn_dist_mask[31:, -5, :] = minn_dist_mask[30: 31, -5, :]
-    minn_dist_mask = minn_dist_mask.float()
-    
-    attraction_mask_new = (tot_base_pts_trans_disp_mask.float().unsqueeze(-1).unsqueeze(-1) + minn_dist_mask.float()) > 1.5
-    
-    
-    
-    # joints: nf x nn_jts_pts x 3; nf x nn_base_pts x 3 
-    dist_joints_to_base_pts_trans = torch.sum(
-      (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1 # nf x nn_jts_pts x nn_base_pts
-    )
-    minn_dist_joints_to_base_pts, minn_dist_idxes = torch.min(dist_joints_to_base_pts_trans, dim=-1) # nf x nn_jts_pts # nf x nn_jts_pts # 
-    nearest_base_normals = model_util.batched_index_select_ours(tot_base_normals_trans, indices=minn_dist_idxes, dim=1) # nf x nn_base_pts x 3 --> nf x nn_jts_pts x 3 # # nf x nn_jts_pts x 3 #
-    nearest_base_pts_trans = model_util.batched_index_select_ours(disp_base_pts_trans, indices=minn_dist_idxes, dim=1) # nf x nn_jts_ts x 3 #
-    dot_nearest_base_normals_trans = torch.sum(
-      nearest_base_normals * nearest_base_pts_trans, dim=-1 # nf x nn_jts 
-    )
-    trans_normals_mask = dot_nearest_base_normals_trans < 0. # nf x nn_jts # nf x nn_jts #
-    nearest_dist = torch.sqrt(minn_dist_joints_to_base_pts)
-    nearest_dist_mask = nearest_dist < 0.005 # hoi seq
-    # nearest_dist_mask = nearest_dist < 0.1
-    k_attr = 100.
-    joint_attraction_k = torch.exp(-1. * k_attr * nearest_dist)
-    attraction_mask_new_new = (attraction_mask_new.float() + trans_normals_mask.float().unsqueeze(-1) + nearest_dist_mask.float().unsqueeze(-1)) > 2.5
-    
-    
-    
-    
-    
-    
-    
-    # opt = optim.Adam([rot_var, transl_var, theta_var], lr=learning_rate)
-    # opt = optim.Adam([transl_var, theta_var], lr=learning_rate)
-    opt = optim.Adam([transl_var, theta_var, rot_var], lr=learning_rate)
-    scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
-    for i in range(num_iters):
-        opt.zero_grad()
-        # mano_layer
-        hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
-            beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
-        hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
-        # hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
-        
-        rhand_anchors = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
-
-
-        hand_joints = rhand_anchors
-        
-        joints_pred_loss = torch.sum(
-          (hand_joints - joints) ** 2, dim=-1
-        ).mean()
-        
-        
-        
-        
-        # dist_joints_to_base_pts_sqr = torch.sum(
-        #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
-        # ) # nf x nnb x 3 ---- nf x nnj x 1 x 3 
-        dist_joints_to_base_pts_sqr = torch.sum(
-            (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1
-        )
-        # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
-        attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
-        # attaction_loss = attaction_loss
-        # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
-        
-        # attaction_loss = torch.mean(attaction_loss * attraction_mask)
-        # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        # seq 80
-        # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        # seq 70
-        # attaction_loss = torch.mean(attaction_loss[10:, -5:-3, :] * minn_dist_mask[10:, -5:-3, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        # new version relying on new mask #
-        # attaction_loss = torch.mean(attaction_loss[:, -5:-3, :] * attraction_mask_new[:, -5:-3, :])
-        ### original version ###
-        # attaction_loss = torch.mean(attaction_loss[20:, -3:, :] * attraction_mask_new[20:, -3:, :])
-        
-        # attaction_loss = torch.mean(attaction_loss[:, -5:, :] * attraction_mask_new_new[:, -5:, :] * joint_attraction_k[:, -5:].unsqueeze(-1))
-        
-        
-        
-        attaction_loss = torch.mean(attaction_loss[:, :, :] * attraction_mask_new_new[:, :, :] * joint_attraction_k[:, :].unsqueeze(-1))
-        
-        
-        # seq mug
-        # attaction_loss = torch.mean(attaction_loss[4:, -5:-4, :] * minn_dist_mask[4:, -5:-4, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-        
-        
-        # opt.zero_grad()
-        pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
-        # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
-        shape_prior_loss = torch.mean(beta_var**2)
-        pose_prior_loss = torch.mean(theta_var**2)
-        joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
-        # =0.05
-        # # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
-        # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
-        
-        # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
-        
-        # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
-        
-        theta_smoothness_loss = F.mse_loss(theta_var, ori_theta_var)
-        # loss = attaction_loss * 1000. + theta_smoothness_loss * 0.00001
-        
-        # attraction loss, joint prediction loss, joints smoothness loss #
-        # loss = attaction_loss * 1000. + joints_pred_loss 
-        ### general ###
-        # loss = attaction_loss * 1000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
-        
-        # tune for seq 140
-        loss = attaction_loss * 10000. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
-        # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
-        # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
-        
-        # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
-        
-        # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
-        
-        # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
-        # loss = joints_pred_loss * 30 + attaction_loss * 0.001
-        
-        opt.zero_grad()
-        loss.backward()
-        opt.step()
-        scheduler.step()
-        
-        print('Iter {}: {}'.format(i, loss.item()), flush=True)
-        print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
-        print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
-        print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
-        print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
-        print('\tAttraction Loss: {}'.format(attaction_loss.item()))
-        print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
-        # theta_smoothness_loss
-        print('\tTheta Smoothness Loss: {}'.format(theta_smoothness_loss.item()))
-  
-  
-    if with_proj:
-      num_iters = 2000
-      num_iters = 1000 # seq 77 # if with contact opt #
-      # num_iters = 500 # seq 77
-      ori_theta_var = theta_var.detach().clone()
-      
-      
-      
-      # opt = optim.Adam([rot_var, transl_var, theta_var], lr=learning_rate)
-      # opt = optim.Adam([transl_var, theta_var], lr=learning_rate)
-      opt = optim.Adam([transl_var, theta_var, rot_var], lr=learning_rate)
-      scheduler = optim.lr_scheduler.StepLR(opt, step_size=num_iters, gamma=0.5)
-      for i in range(num_iters):
-          opt.zero_grad()
-          # mano_layer
-          hand_verts, hand_joints = mano_layer(torch.cat([rot_var, theta_var], dim=-1),
-              beta_var.unsqueeze(1).repeat(1, nn_frames, 1).view(-1, 10), transl_var)
-          hand_verts = hand_verts.view( nn_frames, 778, 3) * 0.001
-          # hand_joints = hand_joints.view(nn_frames, -1, 3) * 0.001
-          
-          # tot_base_pts_trans, tot_base_normals_trans #
-          proj_loss = get_proj_losses(hand_verts, tot_base_pts_trans, tot_base_normals_trans)
-          
-          # rhand_anchors = recover_anchor_batch(hand_verts, face_vertex_index, anchor_weight.unsqueeze(0).repeat(window_size, 1, 1))
-
-
-          # hand_joints = rhand_anchors
-          
-          # joints_pred_loss = torch.sum(
-          #   (hand_joints - joints) ** 2, dim=-1
-          # ).mean()
-          
-          
-          
-          
-          # # dist_joints_to_base_pts_sqr = torch.sum(
-          # #     (hand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(1)) ** 2, dim=-1
-          # # ) # nf x nnb x 3 ---- nf x nnj x 1 x 3 
-          # dist_joints_to_base_pts_sqr = torch.sum(
-          #     (rhand_anchors.unsqueeze(2) - tot_base_pts_trans.unsqueeze(1)) ** 2, dim=-1
-          # )
-          # # attaction_loss = 0.5 * affinity_scores * dist_joints_to_base_pts_sqr
-          # attaction_loss = 0.5 * dist_joints_to_base_pts_sqr
-          # # attaction_loss = attaction_loss
-          # # attaction_loss = torch.mean(attaction_loss[..., -5:, :] * minn_dist_mask[..., -5:, :])
-          
-          # # attaction_loss = torch.mean(attaction_loss * attraction_mask)
-          # # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-          
-          # # seq 80
-          # # attaction_loss = torch.mean(attaction_loss[46:, -5:-3, :] * minn_dist_mask[46:, -5:-3, :]) + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-          
-          # # seq 70
-          # # attaction_loss = torch.mean(attaction_loss[10:, -5:-3, :] * minn_dist_mask[10:, -5:-3, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-          
-          # # new version relying on new mask #
-          # # attaction_loss = torch.mean(attaction_loss[:, -5:-3, :] * attraction_mask_new[:, -5:-3, :])
-          # ### original version ###
-          # # attaction_loss = torch.mean(attaction_loss[20:, -3:, :] * attraction_mask_new[20:, -3:, :])
-          
-          # # attaction_loss = torch.mean(attaction_loss[:, -5:, :] * attraction_mask_new_new[:, -5:, :] * joint_attraction_k[:, -5:].unsqueeze(-1))
-          
-          
-          
-          # attaction_loss = torch.mean(attaction_loss[:, :, :] * attraction_mask_new_new[:, :, :] * joint_attraction_k[:, :].unsqueeze(-1))
-          
-          
-          # seq mug
-          # attaction_loss = torch.mean(attaction_loss[4:, -5:-4, :] * minn_dist_mask[4:, -5:-4, :]) # + torch.mean(attaction_loss[:40, -5:-3, :] * minn_dist_mask[:40, -5:-3, :])
-          
-          
-          # opt.zero_grad()
-          pose_smoothness_loss = F.mse_loss(theta_var.view(nn_frames, -1)[1:], theta_var.view(nn_frames, -1)[:-1])
-          # joints_smoothness_loss = joint_acc_loss(hand_verts, J_regressor.to(device))
-          shape_prior_loss = torch.mean(beta_var**2)
-          pose_prior_loss = torch.mean(theta_var**2)
-          joints_smoothness_loss = F.mse_loss(hand_joints.view(nn_frames, -1, 3)[1:], hand_joints.view(nn_frames, -1, 3)[:-1])
-          # =0.05
-          # # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001 + joints_smoothness_loss * 100.
-          # loss = joints_pred_loss * 30 + pose_smoothness_loss * 0.000001 + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001 + joints_smoothness_loss * 200.
-          
-          # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.05 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + joints_smoothness_loss * 200.
-          
-          # loss = joints_pred_loss * 5000 + pose_smoothness_loss * 0.03 + shape_prior_loss * 0.0002 + pose_prior_loss * 0.0005 # + attaction_loss * 10000 # + joints_smoothness_loss * 200.
-          
-          theta_smoothness_loss = F.mse_loss(theta_var, ori_theta_var)
-          # loss = attaction_loss * 1000. + theta_smoothness_loss * 0.00001
-          
-          # attraction loss, joint prediction loss, joints smoothness loss #
-          # loss = attaction_loss * 1000. + joints_pred_loss 
-          ### general ###
-          # loss = attaction_loss * 1000. + joints_pred_loss * 0.01 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
-          
-          # tune for seq 140
-          loss = proj_loss * 1. + joints_pred_loss * 0.0001 + joints_smoothness_loss * 0.5 # + pose_prior_loss * 0.00005  # + shape_prior_loss * 0.001 # + pose_smoothness_loss * 0.5
-          # loss = joints_pred_loss * 20 + joints_smoothness_loss * 200. + shape_prior_loss * 0.0001 + pose_prior_loss * 0.00001
-          # loss = joints_pred_loss * 30  # + shape_prior_loss * 0.001 + pose_prior_loss * 0.0001
-          
-          # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5 + attaction_loss * 0.001 + joints_smoothness_loss * 1.0
-          
-          # loss = joints_pred_loss * 20 + pose_smoothness_loss * 0.5  + attaction_loss * 2000000.  # + joints_smoothness_loss * 10.0
-          
-          # loss = joints_pred_loss * 20 #  + pose_smoothness_loss * 0.5 + attaction_loss * 100. + joints_smoothness_loss * 10.0
-          # loss = joints_pred_loss * 30 + attaction_loss * 0.001
-          
-          opt.zero_grad()
-          loss.backward()
-          opt.step()
-          scheduler.step()
-          
-          print('Iter {}: {}'.format(i, loss.item()), flush=True)
-          print('\tShape Prior Loss: {}'.format(shape_prior_loss.item()))
-          print('\tPose Prior Loss: {}'.format(pose_prior_loss.item()))
-          print('\tPose Smoothness Loss: {}'.format(pose_smoothness_loss.item()))
-          # print('\tJoints Prediction Loss: {}'.format(joints_pred_loss.item()))
-          print('\tproj_loss Loss: {}'.format(proj_loss.item()))
-          print('\tJoint Smoothness Loss: {}'.format(joints_smoothness_loss.item()))
-          # theta_smoothness_loss
-          print('\tTheta Smoothness Loss: {}'.format(theta_smoothness_loss.item()))
-    
-    
-  # bf_ct_verts, bf_ct_joints #
-  return hand_verts.detach().cpu().numpy(), hand_joints.detach().cpu().numpy(), bf_ct_verts, bf_ct_joints
 
 
 
