@@ -186,12 +186,15 @@ export pert_type="gaussian"
 export model_path="ckpts/model_spatial.pt"
 
 
-
-
+################# Set to your test tags #################
+### set `prve_test_tag` to the `test_tag` specified in the previous script, i.e., predict_grab_rndseed_14.sh 
+### set `test_tag` to your favorate one, but different from `prev_test_tag`
+export test_tag="jts_spatial_grab_t_200_test_"
+export prev_test_tag="jts_grab_t_400_test_"
 
 
 ################# Set to the idx of an available gpu #################
-export cuda_ids=3
+export cuda_ids=1
 
 
 

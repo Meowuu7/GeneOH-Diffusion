@@ -135,7 +135,7 @@ def main():
     
     
     
-    args_path = os.path.join(args.save_dir, 'args.json')
+    args_path = os.path.join(args.save_dir, 'args_jts_only.json')
     with open(args_path, 'w') as fw:
         json.dump(vars(args), fw, indent=4, sort_keys=False)
     
