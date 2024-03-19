@@ -45,7 +45,7 @@ def get_mano_model(ncomps=45, side='right', flat_hand_mean=False, ):
     # ncomps = 45 # mano root #
     batch_size = 1
     mano_model = ManoLayer(
-        mano_root='mano/models', use_pca=True if ncomps == 15 else False, ncomps=ncomps, flat_hand_mean=flat_hand_mean,
+        mano_root='manopth/mano/models', use_pca=True if ncomps == 15 else False, ncomps=ncomps, flat_hand_mean=flat_hand_mean,
         side=side, center_idx=0)
     return mano_model
 
@@ -183,10 +183,9 @@ if __name__ == '__main__':
     ### configs ###
 
     ### get file paths ###
-    #
-    pkl_fn = f"./data/taco/result/{seq_nm}.pkl"
-    predicted_info_fn = f"./data/taco/result/predicted_infos_sv_dict_seed_{seed}_tag_{seq_nm}_jts_spatial_t_{t}_{data_tag}_st_0_0_jts_spatial_t_200_multi_ntag_{ntag}.npy"
-    optimized_fn = f"./data/taco/result/optimized_infos_sv_dict_seq_0_seed_{seed}_tag_{seq_nm}_jts_spatial_t_{t}_{data_tag}_st_0_0_jts_spatial_t_200_dist_thres_0.001_with_proj_False_wmaskanchors_multi_ntag_{ntag}.npy"
+    pkl_fn = f"./data/taco/source_data/{seq_nm}.pkl"
+    predicted_info_fn = f"./data/taco/result/predicted_infos_sv_dict_seed_{seed}_tag_{seq_nm}_jts_spatial_t_{t}_{data_tag}_st_0_multi_ntag_{ntag}.npy"
+    optimized_fn = f"./data/taco/result/optimized_infos_sv_dict_seed_{seed}_tag_{seq_nm}_jts_spatial_t_{t}_{data_tag}_st_0_ntag_{ntag}.npy"
     ### get file paths ###
 
 
