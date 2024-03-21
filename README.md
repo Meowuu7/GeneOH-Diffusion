@@ -237,6 +237,38 @@ To reproduce the above result, follow the steps below:
    
 
 
+### HOI4D
+
+> Here's an example of cleaning an input noisy trajectory `data/hoi4d/source_data/ToyCar/case3/merged_data.npy`. 
+
+
+Below are the input, result, and overlayed video.
+
+
+|        Input        |       Result         |         Overlayed         |
+| :----------------------: | :---------------------: | :-----------------------: |
+| ![](assets/hoi4d_toycar_3_input_a.gif) | ![](assets/hoi4d_toycar_3_ours_seed_44_a.gif) | ![](assets/hoi4d_toycar_3_ours_seed_44_overlayed_a.gif) |
+
+<!-- 
+To reproduce the above result, follow the steps below:
+
+1. **Denoising**
+   ```bash
+   bash scripts/val_examples/predict_taco_rndseed_spatial_20231104_017.sh
+   ```
+   Ten random seeds will be utilized for prediction, and the predicted results will be saved in the folder `./data/taco/result`.
+2. **Mesh reconstruction**
+   ```bash
+   bash scripts/val_examples/reconstruct_taco_20231104_017.sh
+   ```
+   Results will be saved in the same folder as mentioned in the previous step.
+3. **Extracting results and visualization** 
+   ```bash
+   python visualize/vis_taco_example_20231104_017.py
+   ```
+   Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video. -->
+   
+
 ## TODOs
 
 - [x] Example usage, evaluation process and pre-trained models
