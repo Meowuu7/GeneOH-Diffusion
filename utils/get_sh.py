@@ -6,7 +6,9 @@ def get_sh_from_json(json_file):
         
     # test_sh_fn = "data/grab/result/test_exported_sh.sh"
     # test_sh_fn = "scripts/val_examples/predict_grab_rndseed_14_bak.sh"
-    test_sh_fn = "scripts/val_examples/predict_grab_rndseed_14_test.sh"
+    # test_sh_fn = "scripts/val_examples/predict_grab_rndseed_14_test.sh"
+    # test_sh_fn = "scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3.sh"
+    test_sh_fn = "scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3_spatial.sh"
     wf = open(test_sh_fn, "w")
     for key in data:
         val = data[key]
@@ -27,6 +29,9 @@ def get_sh_from_json(json_file):
     # return sh
     
 
+# args ho
 if __name__=='__main__':
     json_file = "data/grab/result/args_jts_only.json"
+    json_file = "/data1/xueyi/eval_save/HOI_Rigid/ToyCar/args_hoi4d.json"
+    json_file = "/data1/xueyi/eval_save/HOI_Rigid/ToyCar/args_hoi4d_spatial.json"
     get_sh_from_json(json_file=json_file)

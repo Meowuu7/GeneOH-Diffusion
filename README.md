@@ -249,25 +249,27 @@ Below are the input, result, and overlayed video.
 | :----------------------: | :---------------------: | :-----------------------: |
 | ![](assets/hoi4d_toycar_3_input_a.gif) | ![](assets/hoi4d_toycar_3_ours_seed_44_a.gif) | ![](assets/hoi4d_toycar_3_ours_seed_44_overlayed_a.gif) |
 
-<!-- 
+
 To reproduce the above result, follow the steps below:
 
 1. **Denoising**
    ```bash
-   bash scripts/val_examples/predict_taco_rndseed_spatial_20231104_017.sh
+   bash scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3.sh
+   #### After completing the above command ####
+   bash scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3_spatial.sh
    ```
-   Ten random seeds will be utilized for prediction, and the predicted results will be saved in the folder `./data/taco/result`.
+   Ten random seeds will be utilized for prediction, and the predicted results will be saved in the folder `./data/hoi4d/ToyCar`.
 2. **Mesh reconstruction**
    ```bash
-   bash scripts/val_examples/reconstruct_taco_20231104_017.sh
+   bash scripts/val_examples/reconstruct_hoi4d_toycar_inst3.sh
    ```
    Results will be saved in the same folder as mentioned in the previous step.
-3. **Extracting results and visualization** 
+<!-- 3. **Extracting results and visualization** 
    ```bash
    python visualize/vis_taco_example_20231104_017.py
    ```
-   Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video. -->
-   
+   Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video.
+    -->
 
 ## TODOs
 
