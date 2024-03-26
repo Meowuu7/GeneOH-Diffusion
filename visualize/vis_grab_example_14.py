@@ -55,7 +55,7 @@ def vis_predicted_joints_grab(predicted_info_fn, optimized_fn=None):
     mano_model = get_mano_model()
     faces = mano_model.th_faces.squeeze(0).numpy()
 
-    ws = ws
+    # ws = ws
     # is_toch = False
     # predicted_info_data = np.load(predicted_info_fn, allow_pickle=True).item()
     if optimized_fn is not None:
@@ -128,8 +128,8 @@ def vis_predicted_joints_grab(predicted_info_fn, optimized_fn=None):
         outputs = np.matmul(outputs, tot_obj_rot) + tot_obj_trans.reshape(tot_obj_trans.shape[0], 1,
                                                                           3)  # ws x nn_obj x 3 #
 
-    if toch_eval_fn is not None:
-        optimized_out_hand_verts = tot_hand_verts[:60]
+    # if toch_eval_fn is not None:
+    #     optimized_out_hand_verts = tot_hand_verts[:60]
 
     jts_radius = 0.03378
     gray_color = (233 / 255., 241 / 255., 148 / 255.)

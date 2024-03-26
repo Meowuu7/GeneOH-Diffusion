@@ -210,7 +210,7 @@ export test_tag="jts_spatial_hoi4d_t_200_test_"
 
 
 
-export cuda_ids=7
+export cuda_ids=0
 
 
 # bash scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3_spatial.sh

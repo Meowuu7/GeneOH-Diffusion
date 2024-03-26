@@ -205,7 +205,7 @@ export test_tag="jts_hoi4d_t_400_test_"
 
 
 
-export cuda_ids=7
+export cuda_ids=0
 
 
 # bash scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3.sh

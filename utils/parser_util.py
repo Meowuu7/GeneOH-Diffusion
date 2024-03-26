@@ -296,6 +296,8 @@ def add_base_options(parser):
     # seq_root
     group.add_argument("--seq_root", default="", type=str,)
     group.add_argument("--grab_path", default="", type=str,)
+    ### HOI4D data root paths ###
+    group.add_argument("--hoi4d_cad_model_root", default="data/hoi4d/CAD_Model", type=str,)
     
 
 

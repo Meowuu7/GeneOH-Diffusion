@@ -96,31 +96,6 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         
         self.use_anchors = args.use_anchors
         
-
-        ''' Load avg, std statistics '''
-        # # self.maxx_rel, minn_rel, maxx_dists, minn_dists #
-        # rel_dists_stats_fn = "/home/xueyi/sim/motion-diffusion-model/base_pts_rel_dists_stats.npy"
-        # rel_dists_stats = np.load(rel_dists_stats_fn, allow_pickle=True).item()
-        # maxx_rel = rel_dists_stats['maxx_rel']
-        # minn_rel = rel_dists_stats['minn_rel']
-        # maxx_dists = rel_dists_stats['maxx_dists']
-        # minn_dists = rel_dists_stats['minn_dists']
-        # self.maxx_rel = torch.from_numpy(maxx_rel).float()
-        # self.minn_rel = torch.from_numpy(minn_rel).float()
-        # self.maxx_dists = torch.from_numpy(maxx_dists).float()
-        # self.minn_dists = torch.from_numpy(minn_dists).float()
-        ''' Load avg, std statistics '''
-        
-        ''' Load avg-jts, std-jts '''
-        # avg_jts_fn = "/home/xueyi/sim/motion-diffusion-model/avg_joints_motion_ours.npy"
-        # std_jts_fn = "/home/xueyi/sim/motion-diffusion-model/std_joints_motion_ours.npy"
-        # avg_jts = np.load(avg_jts_fn, allow_pickle=True)
-        # std_jts = np.load(std_jts_fn, allow_pickle=True)
-        # # self.avg_jts, self.std_jts #
-        # self.avg_jts = torch.from_numpy(avg_jts).float()
-        # self.std_jts = torch.from_numpy(std_jts).float()
-        ''' Load avg-jts, std-jts '''
-        
         
         # self.dist_stra = args.dist_stra
         
@@ -1738,7 +1713,7 @@ def get_object_mesh_ours_arti(obj_fn, obj_rot, obj_trans):
 
 
 # for hoi4d dataset #
-class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
+class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
     def __init__(self, data_folder, split, w_vectorizer, window_size=30, step_size=15, num_points=8000, args=None):
         #### GRAB dataset #### ## GRAB dataset
         self.clips = []
@@ -1757,6 +1732,7 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         
         self.start_idx = args.start_idx
         
+        self.hoi4d_cad_model_root = args.hoi4d_cad_model_root
         # split = args.single_seq_path.split("/")[-2].split("_")[0]
         # self.split = split
         # print(f"split: {self.split}")
@@ -1778,7 +1754,8 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         # self.data_folder = data_folder
         # self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
         # # self.subj_corr_data_folder = args.subj_corr_data_folder
-        self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        # self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        self.mano_path = "manopth/mano/models" 
         # self.aug = True
         # self.use_anchors = False
         # # self.args = args
@@ -1860,18 +1837,18 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         
         # anchor_load_driver, masking_load_driver #
         # use_anchors, self.hand_palm_vertex_mask #
-        if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-            # anchor_load_driver, masking_load_driver #
-            inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-            fvi, aw, _, _ = anchor_load_driver(inpath)
-            self.face_vertex_index = torch.from_numpy(fvi).long()
-            self.anchor_weight = torch.from_numpy(aw).float()
+        # if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
+        #     # anchor_load_driver, masking_load_driver #
+        #     inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
+        #     fvi, aw, _, _ = anchor_load_driver(inpath)
+        #     self.face_vertex_index = torch.from_numpy(fvi).long()
+        #     self.anchor_weight = torch.from_numpy(aw).float()
             
-            anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-            palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-            hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-            # self.hand_palm_vertex_mask for hand palm mask #
-            self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
+        #     anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
+        #     palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
+        #     hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
+        #     # self.hand_palm_vertex_mask for hand palm mask #
+        #     self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
         
     
     def uinform_sample_t(self):
@@ -1986,20 +1963,16 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
         for i_frame in range(i_frame_st, i_frame_ed):
             cur_obj_rot = self.raw_corr_data[i_frame]['obj_rot']
             cur_obj_trans = self.raw_corr_data[i_frame]['obj_trans']
-            # cad_model_fn = [
-            #     "/share/datasets/HOI4D_CAD_Model_for_release/articulated/Scissors/011/objs/new-1-align.obj",  # 
-            #     "/share/datasets/HOI4D_CAD_Model_for_release/articulated/Scissors/011/objs/new-0-align.obj" 
-            # ]
-            
-            # cur_arti_cat_nm = self.args.cad_model_fn.split("/")[-4]
-            # cur_arti_inst_nm = self.args.cad_model_fn.split("/")[-3]
+
             
             cur_arti_cat_nm = cat_nm
             cur_arti_inst_nm = int(series_obj_inst_idx) # ## series obj inst idxes ### 
 
             if not self.args.use_arti_obj:
                 cad_model_fn = [ # get cad models 
-                    f"/share/datasets/HOI4D_CAD_Model_for_release/rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm, 
+                    # f"/share/datasets/HOI4D_CAD_Model_for_release/rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm, 
+                    # f"data/hoi4d/CAD_Model/rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm, 
+                    os.path.join(self.hoi4d_cad_model_root, f"rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm)
                 ]
                 if not isinstance(cur_obj_rot, list):
                     cur_obj_rot = [cur_obj_rot]
@@ -2017,7 +1990,7 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
                             f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm, 
                             f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm 
                         ]
-                        # cad_model_fn = [ # get cad models 
+                        # cad_model_fn = [
                         #     f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm, 
                         #     f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm 
                         # ]
@@ -2038,8 +2011,6 @@ class GRAB_Dataset_V19_Ours(torch.utils.data.Dataset):
             # nn_faces x 3 
             full_cur_obj_verts, full_cur_obj_faces = full_cur_obj_mesh.vertices, full_cur_obj_mesh.faces
 
-            # tot_full_obj_verts = []
-            # tot_full_obj_faces = []
             # tot_full_obj_verts, tot_full_obj_faces
             tot_full_obj_verts.append(full_cur_obj_verts)
             tot_full_obj_faces.append(full_cur_obj_faces)
@@ -5015,7 +4986,7 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
         self.use_anchors = args.use_anchors
         
-        # self.grab_path = "/data1/xueyi/GRAB_extracted"
+        
         obj_mesh_path = "data/grab/object_meshes"
         id2objmesh = []
         obj_meshes = sorted(os.listdir(obj_mesh_path))
@@ -5132,20 +5103,20 @@ class GRAB_Dataset_V19_HHO(torch.utils.data.Dataset): # GRAB datasset #
         
         
         
-        # anchor_load_driver, masking_load_driver #
-        # use_anchors, self.hand_palm_vertex_mask #
-        if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-            # anchor_load_driver, masking_load_driver # 
-            inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-            fvi, aw, _, _ = anchor_load_driver(inpath)
-            self.face_vertex_index = torch.from_numpy(fvi).long()
-            self.anchor_weight = torch.from_numpy(aw).float()
+        # # anchor_load_driver, masking_load_driver #
+        # # use_anchors, self.hand_palm_vertex_mask #
+        # if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
+        #     # anchor_load_driver, masking_load_driver # 
+        #     inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
+        #     fvi, aw, _, _ = anchor_load_driver(inpath)
+        #     self.face_vertex_index = torch.from_numpy(fvi).long()
+        #     self.anchor_weight = torch.from_numpy(aw).float()
             
-            anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-            palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-            hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-            # self.hand_palm_vertex_mask for hand palm mask #
-            self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
+        #     anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
+        #     palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
+        #     hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
+        #     # self.hand_palm_vertex_mask for hand palm mask #
+        #     self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
         
         files_clean = [self.seq_path]
         

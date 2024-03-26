@@ -264,16 +264,17 @@ To reproduce the above result, follow the steps below:
    bash scripts/val_examples/reconstruct_hoi4d_toycar_inst3.sh
    ```
    Results will be saved in the same folder as mentioned in the previous step.
-<!-- 3. **Extracting results and visualization** 
+3. **Extracting results and visualization** 
    ```bash
-   python visualize/vis_taco_example_20231104_017.py
+   python visualize/vis_hoi4d_example_toycar_inst3.py
    ```
    Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video.
-    -->
+   
 
 ## TODOs
 
 - [x] Example usage, evaluation process and pre-trained models
+- [x] HOI4D example usage
 - [ ] Evaluation process on HOI4D, ARCTIC
 - [ ] Data: HOI4D, ARCTIC, and more examples on TACO
 - [ ] Training procedure

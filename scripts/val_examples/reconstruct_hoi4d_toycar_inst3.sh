@@ -10,7 +10,7 @@ export save_dir=data/hoi4d/result
 
 
 
-export cuda_ids=3
+export cuda_ids=0
 
 
 # bash scripts/val_examples/reconstruct_hoi4d_toycar_inst3.sh
