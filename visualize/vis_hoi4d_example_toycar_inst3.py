@@ -219,10 +219,10 @@ if __name__=='__main__':
 
     
     ### get file paths ###
-    seed = 0
+    seed = 44
     
     predicted_info_fn = f"data/hoi4d/result/ToyCar/predicted_infos_seq_{seq_idx}_seed_{seed}_tag_{tag}.npy"
-    optimized_fn = f"data/hoi4d/result/ToyCar/optimized_infos_sv_dict_seq_{seq_idx}_seed_{seed}_tag_{tag}_dist_thres_0.01_with_proj_True.npy"
+    optimized_fn = f"data/hoi4d/result/ToyCar/optimized_infos_sv_dict_seq_{seq_idx}_seed_{seed}_tag_{tag}_dist_thres_0.01_with_proj_False.npy"
 
 
     vis_predicted_joints_hoi4d(predicted_info_fn, optimized_fn)

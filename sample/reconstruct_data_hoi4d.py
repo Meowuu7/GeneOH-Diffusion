@@ -2050,7 +2050,7 @@ if __name__=='__main__':
       with_contact_opt = False
       with_contact_opt = True
       
-      with_proj = False
+      # with_proj = False
       # with_proj = True
       
       with_params_smoothing = False
@@ -2069,7 +2069,7 @@ if __name__=='__main__':
       tot_dist_thres = [0.001, 0.002, 0.005, 0.01]
 
       
-      tot_with_proj = [ True]
+      tot_with_proj = [ False]
 
       # ToyCar
       with_params_smoothing = True
