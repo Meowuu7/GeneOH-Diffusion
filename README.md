@@ -258,7 +258,7 @@ To reproduce the above result, follow the steps below:
    #### After completing the above command ####
    bash scripts/val_examples/predict_hoi4d_rndseed_toycar_inst3_spatial.sh
    ```
-   Ten random seeds will be utilized for prediction, and the predicted results will be saved in the folder `./data/hoi4d/ToyCar`.
+   Ten random seeds will be utilized for prediction, and the predicted results will be saved in the folder `./data/hoi4d/result/ToyCar`.
 2. **Mesh reconstruction**
    ```bash
    bash scripts/val_examples/reconstruct_hoi4d_toycar_inst3.sh
