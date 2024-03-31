@@ -299,6 +299,13 @@ def add_base_options(parser):
     ### HOI4D data root paths ###
     group.add_argument("--hoi4d_cad_model_root", default="data/hoi4d/CAD_Model", type=str,)
     
+    ### HOI4D category name ###
+    group.add_argument("--hoi4d_category_name", default="ToyCar", type=str,)
+    group.add_argument("--hoi4d_data_root", default="data/hoi4d", type=str,)
+    
+    group.add_argument("--hoi4d_eval_st_idx", default=0, type=int,)
+    group.add_argument("--hoi4d_eval_ed_idx", default=1000, type=int,)
+    
 
 
 def add_diffusion_options(parser):

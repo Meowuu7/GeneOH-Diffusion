@@ -159,16 +159,37 @@ def main():
     
     
     if len(args.single_seq_path) > 0:
+        print(f"Single sequence evaluation setting")
         case_idx = args.single_seq_path.split("/")[-2]
         case_idx = int(case_idx[4:]) ## get the case idx ## 
         tot_test_seq_idxes = range(case_idx, case_idx + 1, 1) ## get the case idx ## 
         cat_nm = args.single_seq_path.split("/")[-3] ## get the category name
+        
+        data_root = args.hoi4d_data_root
+        data_root = os.path.join(data_root, cat_nm) 
+        # case_folder_nm = os.path.join(data_root, f"case{test_seq_idx}")
+        
     else:
+        print(f"Category evaluation setting")
         ## TODO: add an arugment to control the category name here ##3
+        rigid_categories = ["Bottle", "Bowl", "Chair", "Kettle", "Knife", "Mug", "ToyCar"]
         cat_nm = args.hoi4d_category_name
         cat_inst_st_idx = args.hoi4d_eval_st_idx
         cat_inst_ed_idx = args.hoi4d_eval_ed_idx ## get the st and ed idxes
         tot_test_seq_idxes = range(cat_inst_st_idx, cat_inst_ed_idx + 1, 1) ## [st, ed_idx] 
+        
+        data_root = args.hoi4d_data_root
+        # if cat_nm in rigid_categories:
+        #     data_root = os.path.join(data_root, "HOI_Processed_Data_Rigid")
+        # else:
+        #     data_root = os.path.join(data_root, "HOI_Processed_Data_Arti")
+        data_root = os.path.join(data_root, cat_nm) 
+        tot_case_folders = os.listdir(data_root)
+        tot_case_folders = [fn for fn in tot_case_folders if "case" in fn]
+        tot_case_idxes = [int(fn[4:]) for fn in tot_case_folders]
+        tot_case_idxes = [idx for idx in tot_case_idxes if idx >= cat_inst_st_idx and idx <= cat_inst_ed_idx]
+        tot_test_seq_idxes = tot_case_idxes
+        ##### 
     
     ### TODO: for hoi4d, the start idx should be carefully selected for each category ###
     if len(args.save_dir) > 0:
@@ -183,12 +204,23 @@ def main():
         print(f"test_seq_idx: {test_seq_idx}")
         for cur_seed in range(0, 122, 11):
 
-            cur_single_seq_path = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
+            # cur_single_seq_path = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
             
-            case_folder_nm =  f"data/hoi4d/{cat_nm}/case{test_seq_idx}" 
+            # case_folder_nm =  f"data/hoi4d/{cat_nm}/case{test_seq_idx}" 
+            # args.single_seq_path = cur_single_seq_path
+            # args.cad_model_fn = f"obj_model.obj"
+            # args.corr_fn = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
+
+            # cur_single_seq_path = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
+            
+            # case_folder_nm =  f"data/hoi4d/{cat_nm}/case{test_seq_idx}" 
+            
+            case_folder_nm = os.path.join(data_root, f"case{test_seq_idx}")
+            cur_single_seq_path = os.path.join(case_folder_nm, "merged_data.npy")
             args.single_seq_path = cur_single_seq_path
             args.cad_model_fn = f"obj_model.obj"
-            args.corr_fn = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
+            # args.corr_fn = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
+            args.corr_fn = cur_single_seq_path
 
             ## toycar ##
             

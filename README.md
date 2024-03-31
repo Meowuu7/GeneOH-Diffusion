@@ -69,7 +69,7 @@ Download models from [this link](https://drive.google.com/drive/folders/1_0p2REW
 
 ### 3. Get data 
 
-**1. GRAB**
+**1. GRAB (for GRAB and GRAB (Beta) test sets)**
 
 - Download the [preprocessed data (object, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgS4lAVZmVnhp4c-2?e=njx6oZ) and extract it into a data folder for GRAB preprocessed object data (e.g., `./data/grab/GRAB_processed`).
 
@@ -81,10 +81,21 @@ Download models from [this link](https://drive.google.com/drive/folders/1_0p2REW
 - Download [GRAB object meshes](https://drive.google.com/file/d/19uvDxyHR9-kFi6wsU-7XFI5HoJu7MaZE/view?usp=sharing) and unzip the obtained `object_meshes.zip` under the folder `./data/grab`.
 - Download [preprocessed data (hand, test split)](https://1drv.ms/u/s!AgSPtac7QUbHgTCIWuIDnf3J9BuK?e=1HsJXu). Extract them under a data folder for GRAB preprocessed subject data (*e.g.* `./data/grab/GRAB_processed_wsubj`).  -->
 
-**2. TACO**
+
+
+
+**2. HOI4D**
+
+- Download [object CAD models](https://1drv.ms/u/s!AgSPtac7QUbHgTNH-TOyYeJrCxCp?e=7IUF3z) and extract it into a data folder for HOI4D object CAD models (e.g., `./data/hoi4d/HOI4D_CAD_Model_for_release`).
+  
+- Download the [preprocessed data (per-category, rigid)](https://1drv.ms/f/s!AgSPtac7QUbHgTR73LM4NKMJQBge?e=FihcFb) and unzip the obtained `CAT_NM.zip` for each category into the folder for HOI4D rigid preprocessed data (e.g. `./data/hoi4d/HOI_Processed_Data_Rigid`).
+  
+- (Articulated data, cooming soon)
+
+
+**3. TACO**
 
 Besides the test datasets mentioned in the paper, we've also evaluated our model on a recent [TACO dataset](https://taco2024.github.io/). Data samples for testing purposes have been included in the folder `./data/taco/source_data`. More data will be incorporated soon.
-
 
 
 
@@ -239,6 +250,8 @@ To reproduce the above result, follow the steps below:
 
 ### HOI4D
 
+**Example**
+
 > Here's an example of cleaning an input noisy trajectory `data/hoi4d/source_data/ToyCar/case3/merged_data.npy`. 
 
 
@@ -269,14 +282,42 @@ To reproduce the above result, follow the steps below:
    python visualize/vis_hoi4d_example_toycar_inst3.py
    ```
    Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video.
-   
+
+**Per-Category Evaluation**
+
+1. **Update data and experimental paths in `.sh` scripts**
+   For evaluating on all sequences of a category `CAT_NM`, modify the followig parameter settings in file `scripts/val/predict_hoi4d_rndseed.sh`, `scripts/val/predict_hoi4d_rndseed_spatial.sh`, and `scripts/val/reconstruct_hoi4d_category.sh` by setting `hoi4d_cad_model_root` to the path to where you have downloaded the `HOI4D_CAD_Model_for_release` (e.g. `data/hoi4d/HOI4D_CAD_Model_for_release`), `hoi4d_data_root` to the path where you have downloaded `HOI_Processed_Data_Rigid` (for a rigid category) or `HOI_Processed_Data_Arti` (for an articulated category), `hoi4d_category_name` to `CAT_NM`, `hoi4d_eval_st_idx` to the minimum sequence index, and `hoi4d_eval_ed_idx` to the maximum sequence index. 
+   ```bash
+   export hoi4d_cad_model_root="data/hoi4d/HOI4D_CAD_Model_for_release"
+   export hoi4d_data_root="data/hoi4d/HOI_Processed_Data_Rigid"
+   export hoi4d_category_name="ToyCar"
+   export hoi4d_eval_st_idx=0
+   export hoi4d_eval_ed_idx=250
+   ```
+
+   Additionally, specify you experiment folders in the above mentioned `.sh` files accordingly by modifying the following argument(s). 
+   ```bash
+   export save_dir="data/hoi4d/result"
+   ```
+2. **Denoising**
+   ```bash
+   bash scripts/val/predict_hoi4d_rndseed.sh
+   #### After completing the above command ####
+   bash scripts/val/predict_hoi4d_rndseed_spatial.sh
+
+3. **Mesh reconstruction**
+   ```bash
+   bash scripts/val/reconstruct_hoi4d_category.sh
+   ```
 
 ## TODOs
 
 - [x] Example usage, evaluation process and pre-trained models
 - [x] HOI4D example usage
-- [ ] Evaluation process on HOI4D, ARCTIC
-- [ ] Data: HOI4D, ARCTIC, and more examples on TACO
+- [x] Evaluation process on HOI4D (Rigid)
+- [x] Data: HOI4D (Rigid)
+- [ ] Evaluation process on HOI4D (Articulated), ARCTIC
+- [ ] Data: HOI4D (Articulated), ARCTIC, and more examples on TACO
 - [ ] Training procedure
   
 
