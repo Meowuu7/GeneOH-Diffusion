@@ -1982,10 +1982,6 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
                         f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm 
                     ]
 
-                    # cad_model_fn = [ # get cad models 
-                    #     f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm, 
-                    #     f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm 
-                    # ]
 
             # object mesh ours arti ###
             full_cur_obj_mesh = get_object_mesh_ours_arti(cad_model_fn, cur_obj_rot, cur_obj_trans)
