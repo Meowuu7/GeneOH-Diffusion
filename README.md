@@ -285,6 +285,8 @@ To reproduce the above result, follow the steps below:
 
 **Per-Category Evaluation**
 
+
+
 1. **Update data and experimental paths in `.sh` scripts**
    
    For evaluating on all sequences of a category `CAT_NM`, modify the followig parameter settings in file `scripts/val/predict_hoi4d_rndseed.sh`, `scripts/val/predict_hoi4d_rndseed_spatial.sh`, and `scripts/val/reconstruct_hoi4d_category.sh` by setting `hoi4d_cad_model_root` to the path to where you have downloaded the `HOI4D_CAD_Model_for_release` (e.g. `data/hoi4d/HOI4D_CAD_Model_for_release`), `hoi4d_data_root` to the path where you have downloaded `HOI_Processed_Data_Rigid` (for a rigid category) or `HOI_Processed_Data_Arti` (for an articulated category), `hoi4d_category_name` to `CAT_NM`, `hoi4d_eval_st_idx` to the minimum sequence index, and `hoi4d_eval_ed_idx` to the maximum sequence index. 
@@ -310,6 +312,9 @@ To reproduce the above result, follow the steps below:
    ```bash
    bash scripts/val/reconstruct_hoi4d_category.sh
    ```
+
+
+
 
 ## TODOs
 

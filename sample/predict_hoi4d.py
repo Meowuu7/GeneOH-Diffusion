@@ -126,10 +126,7 @@ def get_base_pts_rhand_joints_from_data(data):
     tot_obj_transl = torch.cat(tot_obj_transl, dim=0)
     tot_obj_pcs = torch.cat(tot_obj_pcs, dim=0)
     tot_rhand_verts = torch.cat(tot_rhand_verts, dim=0)
-    # tot_obj_idx = torch.cat(tot_obj_idx, dim=0)
-    # tot_obj_global_orient = torch.cat(tot_obj_global_orient, dim=0)
-    # tot_obj_global_transl = torch.cat(tot_obj_global_transl, dim=0)
-    # obj_idx = tot_obj_idx[0].item()
+
     return tot_base_pts, tot_base_normals, tot_rhand_joints, tot_gt_rhand_joints, tot_obj_rot, tot_obj_transl, tot_obj_pcs, tot_rhand_verts
 
 
@@ -174,7 +171,6 @@ def main():
         
     else:
         print(f"Category evaluation setting")
-        ## TODO: add an arugment to control the category name here ##3
         rigid_categories = ["Bottle", "Bowl", "Chair", "Kettle", "Knife", "Mug", "ToyCar"]
         cat_nm = args.hoi4d_category_name
         cat_inst_st_idx = args.hoi4d_eval_st_idx
@@ -200,7 +196,7 @@ def main():
         os.makedirs(args.save_dir, exist_ok=True)
         
         
-    ### TODO: for hoi4d, the start idx should be carefully selected for each category ###
+    ### TODO: for hoi4d, the start idx may vary across different categories ###
     args.start_idx = 0
     args.select_part_idx = 0
     
@@ -209,11 +205,7 @@ def main():
         print(f"test_seq_idx: {test_seq_idx}")
         for cur_seed in range(0, 122, 11): # cur_seed #
             
-            
-            # cur_single_seq_path = f"data/hoi4d/{cat_nm}/case{test_seq_idx}/merged_data.npy"
-            
-            # case_folder_nm =  f"data/hoi4d/{cat_nm}/case{test_seq_idx}" 
-            
+        
             case_folder_nm = os.path.join(data_root, f"case{test_seq_idx}")
             cur_single_seq_path = os.path.join(case_folder_nm, "merged_data.npy")
             args.single_seq_path = cur_single_seq_path
@@ -237,11 +229,11 @@ def main():
             
             
             
-            # print("creating data loader...") ## create model and diffusion ##
+            print("creating data loader...") ## create model and diffusion ##
             data = get_dataset_loader(name=args.dataset, batch_size=args.batch_size, num_frames=args.num_frames, args=args)
 
 
-            # print("creating model and diffusion...")
+            print("creating model and diffusion...")
             model, diffusion = create_model_and_diffusion(args, data)
 
 
@@ -309,13 +301,6 @@ def main():
                     cur_ins_obj_rot_mtx = R.from_rotvec(cur_ins_obj_orient).as_matrix()
                     cur_ins_obj_transl = cur_ins_obj_transl.reshape(1, 3)
 
-
-                    # if args.diff_basejtse:
-                    #     try:
-                    #         full_dec_disp_e_along_normals.append(cur_dec_disp_e_along_normals[cur_ins_rel_idx].detach().cpu().numpy())
-                    #         full_dec_disp_e_vt_normals.append(cur_dec_disp_e_vt_normals[cur_ins_rel_idx].detach().cpu().numpy())
-                    #     except:
-                    #         pass
                     full_targets.append(cur_ins_targets.detach().cpu().numpy())
                     full_outputs.append(cur_ins_outputs.detach().cpu().numpy())
                     full_pert_verts.append(cur_ins_pert_verts.detach().cpu().numpy())
@@ -327,9 +312,6 @@ def main():
             full_pert_verts = np.stack(full_pert_verts, axis=0)
             full_verts = np.stack(full_verts, axis=0)
             
-            # if args.diff_basejtse:
-            #     full_dec_disp_e_along_normals = np.stack(full_dec_disp_e_along_normals, axis=0)
-            #     full_dec_disp_e_vt_normals = np.stack(full_dec_disp_e_vt_normals, axis=0)
             
             
             tot_obj_verts = tot_obj_verts.detach().cpu().numpy()

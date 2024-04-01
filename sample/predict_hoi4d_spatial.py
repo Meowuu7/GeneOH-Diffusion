@@ -191,7 +191,7 @@ def main():
         tot_test_seq_idxes = tot_case_idxes
         ##### 
     
-    ### TODO: for hoi4d, the start idx should be carefully selected for each category ###
+    
     if len(args.save_dir) > 0:
         args.save_dir = os.path.join(args.save_dir, f"{cat_nm}")
         os.makedirs(args.save_dir, exist_ok=True)

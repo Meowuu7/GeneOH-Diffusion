@@ -1834,23 +1834,8 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             root_rot_mode='axisang',
             joint_rot_mode='axisang'
         )
-        
-        # anchor_load_driver, masking_load_driver #
-        # use_anchors, self.hand_palm_vertex_mask #
-        # if self.use_anchors: # use anchors # anchor_load_driver, masking_load_driver #
-        #     # anchor_load_driver, masking_load_driver #
-        #     inpath = "/home/xueyi/sim/CPF/assets" # contact potential field; assets # ##
-        #     fvi, aw, _, _ = anchor_load_driver(inpath)
-        #     self.face_vertex_index = torch.from_numpy(fvi).long()
-        #     self.anchor_weight = torch.from_numpy(aw).float()
-            
-        #     anchor_path = os.path.join("/home/xueyi/sim/CPF/assets", "anchor")
-        #     palm_path = os.path.join("/home/xueyi/sim/CPF/assets", "hand_palm_full.txt")
-        #     hand_region_assignment, hand_palm_vertex_mask = masking_load_driver(anchor_path, palm_path)
-        #     # self.hand_palm_vertex_mask for hand palm mask #
-        #     self.hand_palm_vertex_mask = torch.from_numpy(hand_palm_vertex_mask).bool() ## the mask for hand palm to get hand anchors #
-        
-    
+
+
     def uinform_sample_t(self):
         t = np.random.choice(np.arange(0, self.sigmas_trans.shape[0]), 1).item()
         return t
@@ -1888,10 +1873,7 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         pert_subj_params = np.load(pert_subj_params_fn, allow_pickle=True).item()
         ##### load subj params #####
         
-        # meta data -> lenght of the current clip  -> construct meta data from those saved meta data -> load file on the fly # clip file name -> yes...
-        # print(f"rhand_transl: {rhand_transl.shape},rhand_betas: {rhand_betas.shape}, rhand_pose: {rhand_pose.shape} ")
-        ### pert and clean pair for encoding and decoding ###
-        
+
         # maxx_clip_len = 
         loaded_clip = (
             0, rhand_transl.shape[0], clip_clean,

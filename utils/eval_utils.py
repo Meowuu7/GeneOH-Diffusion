@@ -4,6 +4,12 @@ from manopth.manolayer import ManoLayer
 
 
 import  trimesh
+
+def get_data_cat_type_to_neval_idxes():
+  ToyCar_neval_idxes = [
+    0
+  ]
+
 def load_ply_data(ply_fn):
     # obj_mesh = o3dio.read_triangle_mesh(ply_fn)
     # obj_verts = np.array(obj_mesh.vertices, dtype=np.float32)
