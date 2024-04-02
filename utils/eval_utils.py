@@ -329,7 +329,29 @@ def get_tot_obj_voxes(obj_fn_folder, root):
 
 ## eval_utils 
 
+
+
+def organize_scissors_folder():
+  scissors_root = "/data1/xueyi/HOI_Processed_Data_Arti/Scissors"
+  dst_scissors_root = "/data1/xueyi/HOI_Processed_Data_Arti/Scissors3"
+  os.makedirs(dst_scissors_root, exist_ok=True)
+  tot_scissors_case_folders = os.listdir(scissors_root)
+  for cur_case_nm in tot_scissors_case_folders:
+    print(f"cur_case_nm: {cur_case_nm}")
+    cur_case_folder = os.path.join(scissors_root, cur_case_nm)
+    dst_case_folder = os.path.join(dst_scissors_root, cur_case_nm)
+    os.makedirs(dst_case_folder, exist_ok=True)
+    os.system(f"cp -r {cur_case_folder}/*.npy {dst_case_folder}")
+    os.system(f"cp -r {cur_case_folder}/*.obj {dst_case_folder}")
+    
+
+## get the ziped data and mv to scissrosr but put into the scissors ##
+
 if __name__=='__main__':
+  
+  organize_scissors_folder()
+  exit(0)
+  
   mano_layer = get_mano_model()
   root_path = "/data2/sim/eval_save/HOI_Arti/Scissors"
   test_tag = "jts_hoi4d_arti_t_400_"

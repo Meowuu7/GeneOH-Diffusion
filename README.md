@@ -283,7 +283,7 @@ To reproduce the above result, follow the steps below:
    ```
    Adjust the camera pose in the viewer based on the first frame. Figures of all frames will be captured and saved in the root folder of the project. Finally, use your preferred tool to compile these figures into a video.
 
-**Per-Category Evaluation**
+**Per-Category Evaluation (on rigid categories)**
 
 
 
@@ -313,17 +313,33 @@ To reproduce the above result, follow the steps below:
    bash scripts/val/reconstruct_hoi4d_category.sh
    ```
 
+**Per-Category Evaluation (on articulated categories)**
 
+Follow the above insructions but use the following three scripts for articulated categories instead: `scripts/val/predict_hoi4d_arti_rndseed.sh`, `scripts/val/predict_hoi4d_arti_rndseed_spatial.sh`, and `scripts/val/reconstruct_hoi4d_arti_category.sh`. 
+In each of them, set the argument `hoi4d_data_root` to the root folder where you store the pre-processed articulated data (e.g. `data/hoi4d/HOI_Processed_Data_Arti`). You can vary the value of the argument `select_part_idx` to select which part to use as the base part for providing object points. 
 
+After setting necessary arguments, run the denoising step and mesh reconstruction step as follows: 
+1. **Denoising**
+   ```bash
+   bash scripts/val/predict_hoi4d_arti_rndseed.sh
+   #### After completing the above command ####
+   bash scripts/val/predict_hoi4d_arti_rndseed_spatial.sh
+
+2. **Mesh reconstruction**
+   ```bash
+   bash scripts/val/reconstruct_hoi4d_arti_category.sh
+   ```
+
+Results will be saved in the folder `${save_dir}/${hoi4d_category_name}`. 
 
 ## TODOs
 
 - [x] Example usage, evaluation process and pre-trained models
 - [x] HOI4D example usage
-- [x] Evaluation process on HOI4D (Rigid)
-- [x] Data: HOI4D (Rigid)
-- [ ] Evaluation process on HOI4D (Articulated), ARCTIC
-- [ ] Data: HOI4D (Articulated), ARCTIC, and more examples on TACO
+- [x] Evaluation process on HOI4D (Rigid, Articulated)
+- [x] Data: HOI4D (Rigid, Articulated)
+- [ ] Evaluation process on ARCTIC
+- [ ] Data: ARCTIC, and more examples on TACO
 - [ ] Training procedure
   
 
