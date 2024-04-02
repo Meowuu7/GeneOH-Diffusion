@@ -1964,23 +1964,23 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             else:
                 if cat_nm in ["Scissors", "Laptop"]:
                     if self.args.use_reverse:
-                        cad_model_fn = [ # get cad models 
-                            f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm, 
-                            f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm 
-                        ]
-                    else:
-                        cad_model_fn = [ # get cad models 
-                            f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm, 
-                            f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm 
-                        ]
-                        # cad_model_fn = [
+                        # cad_model_fn = [ # get cad models 
                         #     f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm, 
                         #     f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm 
                         # ]
+                        cad_model_fn = [ # get cad models 
+                            os.path.join(self.hoi4d_cad_model_root, f"articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm),
+                            os.path.join(self.hoi4d_cad_model_root, f"articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm)
+                        ]
+                    else:
+                        cad_model_fn = [ # get cad models 
+                            os.path.join(self.hoi4d_cad_model_root, f"articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm),
+                            os.path.join(self.hoi4d_cad_model_root, f"articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm)
+                        ]
                 else:
                     cad_model_fn = [ # get cad models 
-                        f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm, 
-                        f"/share/datasets/HOI4D_CAD_Model_for_release/articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm 
+                        os.path.join(self.hoi4d_cad_model_root, f"articulated/{cur_arti_cat_nm}/%03d/objs/new-0-align.obj" % cur_arti_inst_nm),
+                        os.path.join(self.hoi4d_cad_model_root, f"articulated/{cur_arti_cat_nm}/%03d/objs/new-1-align.obj" % cur_arti_inst_nm)
                     ]
                 self.cad_model_fn = cad_model_fn[0]
 
