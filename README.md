@@ -338,9 +338,10 @@ Results will be saved in the folder `${save_dir}/${hoi4d_category_name}`.
 - [x] HOI4D example usage
 - [x] Evaluation process on HOI4D (Rigid, Articulated)
 - [x] Data: HOI4D (Rigid, Articulated)
+- [ ] Training procedure
 - [ ] Evaluation process on ARCTIC
 - [ ] Data: ARCTIC, and more examples on TACO
-- [ ] Training procedure
+
   
 
 ## Contact
