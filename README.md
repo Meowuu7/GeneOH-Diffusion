@@ -90,7 +90,7 @@ Download models from [this link](https://drive.google.com/drive/folders/1_0p2REW
   
 - Download the [preprocessed data (per-category, rigid)](https://1drv.ms/f/s!AgSPtac7QUbHgTR73LM4NKMJQBge?e=FihcFb) and unzip the obtained `CAT_NM.zip` for each category into the folder for HOI4D rigid preprocessed data (e.g. `./data/hoi4d/HOI_Processed_Data_Rigid`).
   
-- (Articulated data, cooming soon)
+- Download the [preprocessed data (per-category, articulated)](https://1drv.ms/f/s!AgSPtac7QUbHgTuxX6vRzAA017GU?e=8n5KiP) and unzip the obtained `CAT_NM.zip` for each category into the folder for HOI4D articulated preprocessed data (e.g. `./data/hoi4d/HOI_Processed_Data_Arti`).
 
 
 **3. TACO**
