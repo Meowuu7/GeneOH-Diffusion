@@ -342,7 +342,7 @@ Results will be saved in the folder `${save_dir}/${hoi4d_category_name}`.
 - [ ] Evaluation process on ARCTIC
 - [ ] Data: ARCTIC, and more examples on TACO
 
-  
+
 
 ## Contact
 

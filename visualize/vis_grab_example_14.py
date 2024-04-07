@@ -171,13 +171,13 @@ def vis_predicted_joints_grab(predicted_info_fn, optimized_fn=None):
         tot_hand_verts_woopt.append(sealed_v)
 
         sealed_v, seald_f, center_woopt = seal(pert_verts[i_fr], faces)
-        sealed_v = sealed_v - sealed_v[0:1] + sealed_v_0
+        # sealed_v = sealed_v - sealed_v[0:1] + sealed_v_0
         hand_mesh = ps.register_surface_mesh(f"cur_hand_gt_verts", sealed_v,
                                                 seald_f,
                                                 color=color[2 % len(color)])
 
         # sealed_v, seald_f, center_inputs = seal(optimized_out_hand_verts_woopt[i_fr], faces)
-        sealed_v = sealed_v - 0.5 * np.reshape(center_woopt, (1, 3)) + 0.5 * np.reshape(center_wopt, (1, 3))
+        # sealed_v = sealed_v - 0.5 * np.reshape(center_woopt, (1, 3)) + 0.5 * np.reshape(center_wopt, (1, 3))
 
 
         if cur_obj_faces is not None:

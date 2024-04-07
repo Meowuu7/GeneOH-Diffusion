@@ -147,7 +147,7 @@ def vis_predicted_joints_taco(predicted_info_fn, optimized_fn=None, pkl_fn=None)
                                              color=color[0 % len(color)])
 
         sealed_v, seald_f, center_woopt = seal(pert_verts[i_fr], faces)
-        sealed_v = sealed_v - sealed_v[0:1] + sealed_v_0
+        # sealed_v = sealed_v - sealed_v[0:1] + sealed_v_0
 
         hand_mesh = ps.register_surface_mesh(f"cur_hand_ori_verts", sealed_v,
                                              seald_f,

@@ -1127,7 +1127,7 @@ if __name__=='__main__':
 
 
 
-  tot_rnd_seeds = range(0, 121, 11)
+  tot_rnd_seeds = range(0, 1203, 11)
 
   # st_idxx = 0
 

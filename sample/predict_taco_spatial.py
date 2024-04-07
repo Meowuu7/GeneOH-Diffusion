@@ -170,7 +170,11 @@ def main():
             args.start_idx = st_fr
             
             # random seeds #
-            args.predicted_info_fn = ""
+            # args.predicted_info_fn = ""
+            
+            args.predicted_info_fn = f"predicted_infos_seed_{cur_seed}_tag_{args.prev_test_tag}_st_{args.start_idx}.npy" 
+            args.predicted_info_fn = os.path.join(args.save_dir, args.predicted_info_fn)
+        
             
 
             obj_sv_path = "/".join(args.single_seq_path.split("/")[:-1])
