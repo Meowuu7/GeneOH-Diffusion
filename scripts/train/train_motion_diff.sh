@@ -169,7 +169,7 @@ export seq_root="data/grab/GRAB_processed/test"
 export grab_path="data/grab/GRAB_extracted"
 export save_dir="data/grab/eval_save"
 export grab_processed_dir="data/grab/GRAB_processed"
-export grab_processed_dir="/data1/xueyi/GRAB_processed"
+# export grab_processed_dir="/data1/xueyi/GRAB_processed"
 
 
 ################# Evaluation setting #################
