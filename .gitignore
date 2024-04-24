@@ -15,6 +15,11 @@ __pycache__/
 
 */__pycache__
 
+train/*_local.py
+
+exp/
+
+data/grab/eval_save
 
 scripts/*/*_local.sh
 

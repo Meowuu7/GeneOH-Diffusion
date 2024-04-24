@@ -119,7 +119,7 @@ def get_dataset_loader(name, batch_size, num_frames, split='train', hml_mode='tr
         drop_last = True
 
     num_workers = 8
-    num_workers = 16
+    num_workers = 16 # 
     loader = DataLoader(
         dataset, batch_size=batch_size, shuffle=shuffle_loader,
         num_workers=num_workers, drop_last=drop_last, collate_fn=collate
