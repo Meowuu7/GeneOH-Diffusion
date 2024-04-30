@@ -470,12 +470,12 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         
         
         # ws x nnjoints x nnobjpts #
-        dist_rhand_joints_to_obj_pc = torch.sum(
-            (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        )
-        # dist_pert_rhand_joints_obj_pc = torch.sum(
-        #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
+        # dist_rhand_joints_to_obj_pc = torch.sum(
+        #     (rhand_joints.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
         # )
+        dist_rhand_joints_to_obj_pc = torch.sum(
+            (pert_rhand_verts.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
+        )
         _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
         # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
         
@@ -552,8 +552,8 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
             base_normals = torch.matmul(
                 base_normals, base_pts_global_orient_mtx.transpose(1, 2)  # ws x nn_base_pts x 3 
             )
-            
-            
+        
+        
         
         rhand_joints = torch.matmul(
             rhand_joints - object_trcansl_th.unsqueeze(1), object_global_orient_mtx_th.transpose(1, 2)
@@ -635,10 +635,9 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
             )
             # unsqueeze the dimensiton 1 #
             rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals.unsqueeze(1)[:-1]
-        # nf x nnj x nnb x 3 --> rel_vt_normals ## nf x nnj x nnb
-        # # (ws - 1) x nnj x nnb # # (ws - 1) x nnj x 3 --> 
-        
-        # nf x nnj x nnb ---> dist_vt_normals -> nf x nnj x nnb # # torch.sqrt() ##
+
+
+
         dist_base_pts_to_rhand_joints_vt_normal = torch.sqrt(torch.sum(
             rel_base_pts_to_rhand_joints_vt_normal ** 2, dim=-1
         ))
@@ -3207,16 +3206,11 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
         aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
         aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
-        aug_trans, aug_rot, aug_pose = 0.000, 0.00, 0.00
-        # noise scale #
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3 # scale 1 for the standard scale
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.4 ### scale 3 for the standard scale ###
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.5
-        # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
+        # aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
+        # aug_trans, aug_rot, aug_pose = 0.000, 0.00, 0.00
+
+
         # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # ### === get and save noise vectors === ###
         # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
         aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
         aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
@@ -3244,9 +3238,9 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         else:
             cur_mano_layer = self.rgt_mano_layer
         
-        # rhand_joints --> ws x nnjoints x 3 --> rhandjoitns! #
-        # pert_rhand_joints, rhand_joints -> ws x nn_joints x 3 #
-        # pert_rhand_betas_var, rhand_beta_var
+        
+        
+        
         rhand_verts, rhand_joints = cur_mano_layer(
             torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
             rhand_beta_var.unsqueeze(0).repeat(self.window_size, 1).view(-1, 10), rhand_transl_var
@@ -3255,9 +3249,8 @@ class GRAB_Dataset_V19_Arctic(torch.utils.data.Dataset): # GRAB datasset #
         rhand_verts = rhand_verts * 0.001
         rhand_joints = rhand_joints * 0.001
         
-        # rhand_anchors, pert_rhand_anchors #
-        # rhand_anchors, canon_rhand_anchors #
-        # use_anchors, self.hand_palm_vertex_mask #
+        
+        
         if self.use_anchors: # # rhand_anchors: bsz x nn_hand_anchors x 3 #
             # rhand_anchors = rhand_verts[:, self.hand_palm_vertex_mask] # nf x nn_anchors x 3 --> for the anchor points ##
             rhand_anchors = recover_anchor_batch(rhand_verts, self.face_vertex_index, self.anchor_weight.unsqueeze(0).repeat(self.window_size, 1, 1))
