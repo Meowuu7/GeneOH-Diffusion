@@ -476,11 +476,7 @@ class GRAB_Dataset_V19(torch.utils.data.Dataset):
         dist_rhand_joints_to_obj_pc = torch.sum(
             (pert_rhand_verts.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
         )
-        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
-        
-        
-        # if we just set a parameter `use_arti_obj`? #
+        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1)
         
         if not self.args.use_arti_obj:
             object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
@@ -1718,9 +1714,6 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         self.clips = []
         self.len = 0
         
-        # self.single_seq_path = args.single_seq_path
-        # self.data = np.load(self.single_seq_path, allow_pickle=True) # .item()
-        
         
         self.window_size = window_size
         self.step_size = step_size
@@ -1732,41 +1725,25 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         self.start_idx = args.start_idx
         
         self.hoi4d_cad_model_root = args.hoi4d_cad_model_root
-        # split = args.single_seq_path.split("/")[-2].split("_")[0]
-        # self.split = split
-        # print(f"split: {self.split}")
-        
-        # self.model_type = 'v1_wsubj_wjointsv25'
-        # self.debug = False
-        # # self.use_ambient_base_pts = args.use_ambient_base_pts
-        # # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        # self.num_sche_steps = 100
-        # self.w_vectorizer = w_vectorizer
-        # self.use_pert = True
-        # self.use_rnd_aug_hand = True
+
+
+
         
         self.args = args
         self.use_anchors = self.args.use_anchors
         
-        self.denoising_stra = args.denoising_stra ## denoising_stra!
+        self.denoising_stra = args.denoising_stra
         
-        # self.data_folder = data_folder
-        # self.subj_data_folder = '/data1/xueyi/GRAB_processed_wsubj'
-        # # self.subj_corr_data_folder = args.subj_corr_data_folder
-        # self.mano_path = "/data1/xueyi/mano_models/mano/models" ### mano_path
+        
         self.mano_path = "manopth/mano/models" 
-        # self.aug = True
-        # self.use_anchors = False
-        # # self.args = args
+
+
         
         predicted_info_fn = args.predicted_info_fn
         # load data from predicted information #
         if len(predicted_info_fn) > 0:
             print(f"Loading preidcted info from {predicted_info_fn}")
             data = np.load(predicted_info_fn, allow_pickle=True).item()
-            # /data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_scissors_optimized_aug.npy
-            # data_opt_info_fn = "/data1/xueyi/mdm/eval_save/optimized_infos_sv_dict_seq_scissors_optimized_aug.npy" # scissors aug #
-            # data_opt = np.load(data_opt_info_fn, allow_pickle=True).item()
             outputs = data['outputs']
             # nf x nnjoints x 3 #
             self.predicted_hand_joints = outputs # nf x nnjoints x 3 #
@@ -1783,19 +1760,6 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
                 self.predicted_hand_theta = torch.from_numpy(self.predicted_hand_theta).float() # nframes x 24 
                 self.predicted_hand_beta = torch.from_numpy(self.predicted_hand_beta).float() # 10,
                 
-                # self.predicted_hand_trans_opt = data_opt['rhand_trans'] # nframes x 3 
-                # self.predicted_hand_rot_opt = data_opt['rhand_rot'] # nframes x 3 
-                # self.predicted_hand_theta_opt = data_opt['rhand_theta']
-                # self.predicted_hand_beta_opt = data_opt['rhand_beta']
-                # self.predicted_hand_trans_opt = torch.from_numpy(self.predicted_hand_trans_opt).float() # nframes x 3 
-                # self.predicted_hand_rot_opt = torch.from_numpy(self.predicted_hand_rot_opt).float() # nframes x 3 
-                # self.predicted_hand_theta_opt = torch.from_numpy(self.predicted_hand_theta_opt).float() # nframes x 24 
-                # self.predicted_hand_beta_opt = torch.from_numpy(self.predicted_hand_beta_opt).float() # 10,
-                
-                # self.predicted_hand_trans[9:] = self.predicted_hand_trans_opt[9:]
-                # self.predicted_hand_rot[9:] = self.predicted_hand_rot_opt[9:]
-                # self.predicted_hand_theta[ 9:] = self.predicted_hand_theta_opt[ 9:]
-                # # self.predicted_hand_trans[:, 9:] = self.predicted_hand_trans_opt[:, 9:]
                 
             else:
                 self.predicted_hand_trans = None
@@ -1951,9 +1915,7 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             cur_arti_inst_nm = int(series_obj_inst_idx) # ## series obj inst idxes ### 
 
             if not self.args.use_arti_obj:
-                cad_model_fn = [ # get cad models 
-                    # f"/share/datasets/HOI4D_CAD_Model_for_release/rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm, 
-                    # f"data/hoi4d/CAD_Model/rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm, 
+                cad_model_fn = [
                     os.path.join(self.hoi4d_cad_model_root, f"rigid/{cur_arti_cat_nm}/%03d.obj" % cur_arti_inst_nm)
                 ]
                 if not isinstance(cur_obj_rot, list):
@@ -1986,16 +1948,14 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
 
             # object mesh ours arti ###
             full_cur_obj_mesh = get_object_mesh_ours_arti(cad_model_fn, cur_obj_rot, cur_obj_trans)
-            # nn_verts x 3 
-            # nn_faces x 3 
+
+
             full_cur_obj_verts, full_cur_obj_faces = full_cur_obj_mesh.vertices, full_cur_obj_mesh.faces
 
-            # tot_full_obj_verts, tot_full_obj_faces
+
             tot_full_obj_verts.append(full_cur_obj_verts)
             tot_full_obj_faces.append(full_cur_obj_faces)
 
-            
-            ## se
             if self.args.select_part_idx != -1:
                 cad_model_fn = [cad_model_fn[self.args.select_part_idx]]
                 
@@ -2006,18 +1966,16 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
                 cur_obj_trans = [cur_obj_trans[self.args.select_part_idx]]
 
                 cur_frame_data = case_merged_data[i_frame]
-                cur_theta = cur_frame_data['theta'].squeeze(0).numpy() # 24 current theta 
-                cur_beta = cur_frame_data['beta'].squeeze(0).numpy() ## beta 
-                cur_rhand_transl = cur_frame_data['trans'].squeeze(0).numpy() # ## rhand trans for the cur_frame_data
+                cur_theta = cur_frame_data['theta'].squeeze(0).numpy()
+                cur_beta = cur_frame_data['beta'].squeeze(0).numpy()
+                cur_rhand_transl = cur_frame_data['trans'].squeeze(0).numpy()
                 cur_rhand_joints = cur_frame_data['joints'].reshape(-1)
 
 
                 tot_obj_glb_rot.append(cur_obj_glb_rot)
-                # tot_obj_glb_trans.append(cur_obj_glb_trans)
-
+                
             cur_obj_mesh = get_object_mesh_ours_arti(cad_model_fn, cur_obj_rot, cur_obj_trans)
-            # nn_verts x 3 
-            # nn_faces x 3 
+            # nn_verts x 3 #
             cur_obj_verts, cur_obj_faces = cur_obj_mesh.vertices, cur_obj_mesh.faces
             obj_center = np.mean(cur_obj_verts, axis=0, keepdims=True)
 
@@ -2045,8 +2003,6 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         tot_obj_faces = np.stack(tot_obj_faces, axis=0)
         tot_obj_normals  = np.stack(tot_obj_normals, axis=0)
 
-        # # tot_full_obj_verts, tot_full_obj_faces
-        
         if len(tot_obj_glb_rot) > 0:
             tot_obj_glb_rot = np.stack(tot_obj_glb_rot, axis=0)
             tot_obj_glb_trans = np.stack(tot_obj_glb_trans, axis=0)
@@ -2062,57 +2018,23 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         return tot_obj_verts, tot_obj_faces, tot_obj_normals, tot_obj_glb_rot, tot_obj_glb_trans, tot_hand_beta, tot_hand_theta, tot_hand_transl, tot_hand_joints, tot_full_obj_verts, tot_full_obj_faces
 
 
-    #### enforce correct contacts #### ### the sequence in the clip is what we want here #
+
     def __getitem__(self, index):
-        ## GRAB single frame ##
-        # for i_c, c in enumerate(self.clips):
-        #     if index < c[1]:
-        #         break
-        # i_c = 0
-        
-        # start_idx = 0
+
         
         start_idx = self.start_idx
         if len(self.corr_fn) > 0 and self.data_buffer is None:
-            cur_obj_verts, cur_obj_faces, cur_obj_normals, cur_obj_glb_rot, cur_obj_glb_trans, tot_hand_beta, tot_hand_theta, tot_hand_transl, tot_hand_joints, tot_full_obj_verts, tot_full_obj_faces = self.get_ari_obj_fr_x(start_idx, start_idx + self.window_size) # nn_obj_verts x 3; nn_obj_faces x 3 #
+            cur_obj_verts, cur_obj_faces, cur_obj_normals, cur_obj_glb_rot, cur_obj_glb_trans, tot_hand_beta, tot_hand_theta, tot_hand_transl, tot_hand_joints, tot_full_obj_verts, tot_full_obj_faces = self.get_ari_obj_fr_x(start_idx, start_idx + self.window_size)
             print(f"corr_fn: {self.corr_fn}, obj_verts: {cur_obj_verts.shape}, cur_obj_faces: {cur_obj_faces.shape}")
             self.data_buffer = (cur_obj_verts, cur_obj_faces, cur_obj_normals, cur_obj_glb_rot, cur_obj_glb_trans, tot_hand_beta, tot_hand_theta, tot_hand_transl, tot_hand_joints, tot_full_obj_verts, tot_full_obj_faces)
         elif len(self.corr_fn) > 0:
             cur_obj_verts, cur_obj_faces, cur_obj_normals, cur_obj_glb_rot, cur_obj_glb_trans, tot_hand_beta, tot_hand_theta, tot_hand_transl, tot_hand_joints, tot_full_obj_verts, tot_full_obj_faces = self.data_buffer
-            
-        # if self.load_meta:
-        #     # self.load_clip_data(i_c)
-        # c = self.clips[i_c]
-        # c = self.load_clip_data(i_c)
 
-        # object_id = c[3][-1]
-        # object_name = self.id2objmeshname[object_id]
-        
-        # start_idx = index * self.step_size
-        # if start_idx + self.window_size > self.len:
-        #     start_idx = self.len - self.window_size
-            
-        # TODO: add random noise settings for noisy input #
-        
-        # start_idx = (index - c[0]) * self.step_size
-        
-        # num_points = self.data['f1'].shape[0] // 3
-        # rhand_pc = self.data[index]['f0'].reshape(778, 3) # method to get such data cannot generalize well...
-        # object_pc = self.data[index]['f1'].reshape(-1, 3)
-        # object_vn = self.data[index]['f2'].reshape(-1, 3)
-        # object_corr_mask = self.data[index]['f5'].reshape(-1)
-        # object_corr_pts = self.data[index]['f7'].reshape(-1, 3)
-        # object_corr_dist = self.data[index]['f6'].reshape(-1)
-        
-        
+
+
         if self.args.select_part_idx != -1:
-            # tot_obj_verts_th = torch.from_numpy(cur_obj_verts).float()
-            # tot_obj_faces_th = torch.from_numpy(cur_obj_faces).long()
-            # tot_obj_normals_th = torch.from_numpy(tot_obj_normals).float()
-
             object_pc = cur_obj_verts.copy()
             object_vn = cur_obj_normals.copy()
-            # object_pc = cur_obj_verts.copy()
         else:
             object_pc = self.data['f1'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
             object_vn = self.data['f2'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
@@ -2125,98 +2047,47 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             print(f"rhand_transl: {rhand_transl.shape}, rhand_beta: {rhand_beta.shape},rhand_beta: {rhand_beta.shape}, rhand_theta: {rhand_theta.shape} ")
         else:
             rhand_joints = self.data['f11'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1, 3).astype(np.float32)
-            
-            # rhand_glb_rot, rhand_pose, rhand_joints_gt, minn_dists_rhand_joints_object_pc,
-            # rhand_joints = self.data[index]['f11'].reshape(21, 3).astype(np.float32)
-            # rhand_joints = rhand_joints * 0.001
-            # rhand_joints = rhand_joints - obj_center
-            
-            # rhand_joints_fr_data = rhand_joints.copy() ## rhandjoints
-            
+
+
             
             rhand_transl = self.data['f10'][start_idx: start_idx + self.window_size].reshape(self.window_size, 3).astype(np.float32)
             # rhand_transl = rhand_transl - obj_center[0]
             rhand_beta = self.data['f9'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1).astype(np.float32)
             rhand_theta = self.data['f8'][start_idx: start_idx + self.window_size].reshape(self.window_size, -1).astype(np.float32)
             
-        
-        # rhand_transl_clean = self.clean_data[index]['f10'].reshape(3).astype(np.float32)
-        # rhand_theta_clean = self.clean_data[index]['f8'].reshape(-1).astype(np.float32)
-        
+
         rhand_glb_rot = rhand_theta[:, :3]
         rhand_theta = rhand_theta[:, 3:]
         
-        ##### rhand transl #####
-        # rhand_glb_rot = rhand_theta_clean[:3]
-        # rhand_transl = rhand_transl_clean
-        ##### rhand transl #####
-        
+
+
         # rhand_global_orient_var, rhand_pose_var, rhand_transl_var, rhand_beta_var #
-        rhand_global_orient_var = torch.from_numpy(rhand_glb_rot).float() # .unsqueeze(0)
-        rhand_pose_var = torch.from_numpy(rhand_theta).float() # . unsqueeze(0)
-        rhand_transl_var = torch.from_numpy(rhand_transl).float() # .unsqueeze(0)
-        rhand_beta_var = torch.from_numpy(rhand_beta).float() # .unsqueeze(0)
+        rhand_global_orient_var = torch.from_numpy(rhand_glb_rot).float()
+        rhand_pose_var = torch.from_numpy(rhand_theta).float()
+        rhand_transl_var = torch.from_numpy(rhand_transl).float()
+        rhand_beta_var = torch.from_numpy(rhand_beta).float()
         
         
-        # dataset ours single seq #
-        
-        # # rhand_global_orient = self.data[index]['f1'].reshape(-1).astype(np.float32)
-        # rhand_pose = rhand_theta
-        # # rhand_transl = self.subj_params['rhand_transl'][index].reshape(-1).astype(np.float32)
-        # rhand_betas = rhand_beta
         
         
         print(f"rhand_global_orient_var: {rhand_global_orient_var.size()}, rhand_pose_var: {rhand_pose_var.size()}, rhand_beta_var: {rhand_beta_var.size()}")
-        ####### Get rhand_verts and rhand_joint #######
+
         rhand_verts, rhand_joints = self.mano_layer(
             torch.cat([rhand_global_orient_var, rhand_pose_var], dim=-1),
             rhand_beta_var.view(-1, 10), rhand_transl_var
         )
         rhand_verts = rhand_verts * 0.001
         rhand_joints = rhand_joints * 0.001
-        ####### Get rhand_verts and rhand_joint #######
-        
-        
-        if self.use_anchors: # # rhand_anchors: bsz x nn_hand_anchors x 3 #
-            # rhand_anchors = rhand_verts[:, self.hand_palm_vertex_mask] # nf x nn_anchors x 3 --> for the anchor points ##
+
+
+        if self.use_anchors:
             rhand_anchors = recover_anchor_batch(rhand_verts, self.face_vertex_index, self.anchor_weight.unsqueeze(0).repeat(self.window_size, 1, 1))
             pert_rhand_anchors = rhand_anchors
-            # print(f"rhand_anchors: {rhand_anchors.size()}") ### recover rhand verts here ###
-        
-        
-        # rhand_transl = rhand_transl - obj_center[0]
-        
+
         
         pert_rhand_joints = rhand_joints
         pert_rhand_verts = rhand_verts
         
-        
-        # data = c[2][start_idx:start_idx+self.window_size]
-        # # # object_global_orient = self.data[index]['f5']
-        # # # object_transl = self.data[index]['f6'] #
-        # # object_global_orient = data['f5'] ### get object global orientations ###
-        # # object_trcansl = data['f6']
-        # # # object_id = data['f7'][0].item() ### data_f7 item ###
-        # # ## two variants: 1) canonicalized joints; 2) parameters directly; ##
-        
-        # object_global_orient = c[3][-3] # num_frames x 3 
-        # object_transl = c[3][-2] # num_frames x 3
-        
-        
-        # # object_global_orient, object_transl #
-        # object_global_orient = object_global_orient[start_idx: start_idx + self.window_size]
-        # object_transl = object_transl[start_idx: start_idx + self.window_size]
-        # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # object_transl = object_transl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # # object_global_orient = object_global_orient.reshape(self.window_size, -1).astype(np.float32)
-        # # object_trcansl = object_trcansl.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # object_global_orient_mtx = utils.batched_get_orientation_matrices(object_global_orient)
-        # object_global_orient_mtx_th = torch.from_numpy(object_global_orient_mtx).float()
-        # object_trcansl_th = torch.from_numpy(object_transl).float()
         
         
         if self.args.select_part_idx != -1:
@@ -2227,76 +2098,16 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             object_trcansl_th = torch.from_numpy(object_transl).float()
         else:
             # transpose objects #
-            object_global_orient = self.data['f3'][start_idx: start_idx + self.window_size].reshape(self.window_size, 3, 3).astype(np.float32) # nf x 
+            object_global_orient = self.data['f3'][start_idx: start_idx + self.window_size].reshape(self.window_size, 3, 3).astype(np.float32) 
             object_global_orient = np.transpose(object_global_orient, (0, 2, 1))
             object_global_orient_mtx_th = torch.from_numpy(object_global_orient).float()
             object_transl = self.data['f4'][start_idx: start_idx + self.window_size].reshape(self.window_size, 3).astype(np.float32)
             object_trcansl_th = torch.from_numpy(object_transl).float()
         
-        # # pert_subj_params = c[4]
-        
-        # st_idx, ed_idx = start_idx, start_idx + self.window_size ## start idx and end idx
-        
-        # ### pts gt ###
-        # ## rhnad pose, rhand pose gt ##
-        # ## glboal orientation and hand pose #
-        # rhand_global_orient_gt, rhand_pose_gt = c[3][3], c[3][4]
-        # print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}")
-        # rhand_global_orient_gt = rhand_global_orient_gt[start_idx: start_idx + self.window_size]
-        # print(f"rhand_global_orient_gt: {rhand_global_orient_gt.shape}, start_idx: {start_idx}, window_size: {self.window_size}, len: {self.len}")
-        # rhand_pose_gt = rhand_pose_gt[start_idx: start_idx + self.window_size]
-        
-        # rhand_global_orient_gt = rhand_global_orient_gt.reshape(self.window_size, -1).astype(np.float32)
-        # rhand_pose_gt = rhand_pose_gt.reshape(self.window_size, -1).astype(np.float32)
-        
-        
-        # rhand_transl, rhand_betas = c[3][5], c[3][6]
-        # rhand_transl, rhand_betas = rhand_transl[start_idx: start_idx + self.window_size], rhand_betas
-        
-        # # print(f"rhand_transl: {rhand_transl.shape}, rhand_betas: {rhand_betas.shape}")
-        # rhand_transl = rhand_transl.reshape(self.window_size, -1).astype(np.float32)
-        # rhand_betas = rhand_betas.reshape(-1).astype(np.float32)
-        
-        # # # orientation rotation matrix #
-        # # rhand_global_orient_mtx_gt = utils.batched_get_orientation_matrices(rhand_global_orient_gt)
-        # # rhand_global_orient_mtx_gt_var = torch.from_numpy(rhand_global_orient_mtx_gt).float()
-        # # # orientation rotation matrix #
-        
-        # rhand_global_orient_var = torch.from_numpy(rhand_global_orient_gt).float()
-        # rhand_pose_var = torch.from_numpy(rhand_pose_gt).float()
-        # rhand_beta_var = torch.from_numpy(rhand_betas).float()
-        # rhand_transl_var = torch.from_numpy(rhand_transl).float() # self.window_size x 3
-        # # R.from_rotvec(obj_rot).as_matrix()
-        
-        # ### rhand_global_orient_var, rhand_pose_var, rhand_transl_var ###
-        # ### aug_global_orient_var, aug_pose_var, aug_transl_var ###
-        # #### ==== get random augmented pose, rot, transl ==== ####
-        # # rnd_aug_global_orient_var, rnd_aug_pose_var, rnd_aug_transl_var #
-        # aug_trans, aug_rot, aug_pose = 0.01, 0.05, 0.3
-        # aug_trans, aug_rot, aug_pose = 0.001, 0.05, 0.3
-        # aug_trans, aug_rot, aug_pose = 0.000, 0.05, 0.3
-        # # cur_t = self.uinform_sample_t()
-        # # aug_trans, aug_rot, aug_pose #
-        # aug_trans, aug_rot, aug_pose = self.sigmas_trans[cur_t].item(), self.sigmas_rot[cur_t].item(), self.sigmas_pose[cur_t].item()
-        # # ### === get and save noise vectors === ###
-        # # ### aug_global_orient_var,  aug_pose_var, aug_transl_var ### # estimate noise # ###
-        # aug_global_orient_var = torch.randn_like(rhand_global_orient_var) * aug_rot ### sigma = aug_rot
-        # aug_pose_var =  torch.randn_like(rhand_pose_var) * aug_pose ### sigma = aug_pose
-        # aug_transl_var = torch.randn_like(rhand_transl_var) * aug_trans ### sigma = aug_trans
-        # # # rnd_aug_global_orient_var = rhand_global_orient_var + torch.randn_like(rhand_global_orient_var) * aug_rot
-        # # # rnd_aug_pose_var = rhand_pose_var + torch.randn_like(rhand_pose_var) * aug_pose
-        # # # rnd_aug_transl_var = rhand_transl_var + torch.randn_like(rhand_transl_var) * aug_trans
-        # # ### creat augmneted orientations, pose, and transl ###
-        # rnd_aug_global_orient_var = rhand_global_orient_var + aug_global_orient_var
-        # rnd_aug_pose_var = rhand_pose_var + aug_pose_var
-        # rnd_aug_transl_var = rhand_transl_var + aug_transl_var ### aug transl 
-        
         
         object_normal = object_vn
-        object_pc_th = torch.from_numpy(object_pc).float() # num_frames x nn_obj_pts x 3 #
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        object_normal_th = torch.from_numpy(object_normal).float() # nn_ogj x 3
-        # # object_normal_th = object_normal_th[0].unsqueeze(0).repeat(rhand_verts.size(0),)
+        object_pc_th = torch.from_numpy(object_pc).float() 
+        object_normal_th = torch.from_numpy(object_normal).float() 
         
         
         # ws x nnjoints x nnobjpts #
@@ -2306,66 +2117,19 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         # dist_pert_rhand_joints_obj_pc = torch.sum(
         #     (pert_rhand_joints_th.unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
         # )
-        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1) # num_frames x nn_hand_verts 
-        # # nf x nn_obj_pc x 3 xxxx nf x nn_rhands -> nf x nn_rhands x 3
+        _, minn_dists_joints_obj_idx = torch.min(dist_rhand_joints_to_obj_pc, dim=-1)
         
-        
-        # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-        # nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
-        # # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-        # dist_object_pc_nearest_pcs = torch.sum(
-        #     (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1
-        # )
-        # dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs
-        # dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs #
-        # # # dist_threshold = 0.01
-        # dist_threshold = self.dist_threshold
-        # # # dist_threshold for pc_nearest_pcs #
-        # dist_object_pc_nearest_pcs = torch.sqrt(dist_object_pc_nearest_pcs)
-        
-        # # # base_pts_mask: nn_obj_pcs #
-        # base_pts_mask = (dist_object_pc_nearest_pcs <= dist_threshold)
-        # # # nn_base_pts x 3 -> torch tensor #
-        # base_pts = object_pc_th[0][base_pts_mask]
-        # # # base_pts_bf_sampling = base_pts.clone()
-        # base_normals = object_normal_th[0][base_pts_mask]
-        
-        # nn_base_pts = self.nn_base_pts
-        # base_pts_idxes = utils.farthest_point_sampling(base_pts.unsqueeze(0), n_sampling=nn_base_pts)
-        # base_pts_idxes = base_pts_idxes[:nn_base_pts]
-        # # if self.debug:
-        # #     print(f"base_pts_idxes: {base_pts.size()}, nn_base_sampling: {nn_base_pts}")
-        
-        # # ### get base points ### # base_pts and base_normals #
-        # base_pts = base_pts[base_pts_idxes] # nn_base_sampling x 3 #
-        # base_normals = base_normals[base_pts_idxes]
-        
-        
-        # # # object_global_orient_mtx # nn_ws x 3 x 3 #
-        # base_pts_global_orient_mtx = object_global_orient_mtx_th[0] # 3 x 3
-        # base_pts_transl = object_trcansl_th[0] # 3
-        
-        # # if self.dir_stra == "rot_angles": ## rot angles ##
-        # #     normals_rot_mtx = utils.batched_get_rot_mtx_fr_vecs_v2(base_normals)
-        
-        # # if self.canon_obj:
-        #     ## reverse transform base points ###
-        #     ## canonicalize base points and base normals ###
-        # base_pts =  torch.matmul((base_pts - base_pts_transl.unsqueeze(0)), base_pts_global_orient_mtx.transpose(1, 0)
-        #     ) # .transpose(0, 1)
-        # base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
-        #     ) # .transpose(0, 1)
         
         
         if not self.args.use_arti_obj:
             object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-            nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1) # object pc #
-            # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
+            nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
+
             dist_object_pc_nearest_pcs = torch.sum( # - nearesst obj pc # # ws x nn_obj x 1 x 3 --- ws x 1 x nnjts x 3 --> ws x nn_obj x nn_jts
                 (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1 # ws x nn_obj x nn_jts #
             ) 
             dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # nf x nn_obj_pcs # nearest to all pts in all frames ## 
-            dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0) # nn_obj_pcs # nn_obj_pcs # nn_obj_pcs #
+            dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=0)
             # # dist_threshold = 0.01 # threshold 
             dist_threshold = self.dist_threshold
             # # dist_threshold for pc_nearest_pcs # dist object pc nearest pcs #
@@ -2396,10 +2160,8 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             base_normals = torch.matmul((base_normals), base_pts_global_orient_mtx.transpose(1, 0)
                 ) # .transpose(0, 1)
         else:
-            # object_pc_th = object_pc_th[0].unsqueeze(0).repeat(self.window_size, 1, 1).contiguous()
-            nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1) # nearest_obj_pcs: ws x nn_jts x 3 --> for nearet obj pcs # 
-            # # dist_object_pc_nearest_pcs: nf x nn_obj_pcs x nn_rhands
-            dist_object_pc_nearest_pcs = torch.sum( # - nearesst obj pc # # ws x nn_obj x 1 x 3 --- ws x 1 x nnjts x 3 --> ws x nn_obj x nn_jts
+            nearest_obj_pcs = utils.batched_index_select_ours(values=object_pc_th, indices=minn_dists_joints_obj_idx, dim=1)
+            dist_object_pc_nearest_pcs = torch.sum( 
                 (object_pc_th.unsqueeze(2) - nearest_obj_pcs.unsqueeze(1)) ** 2, dim=-1 # ws x nn_obj x nn_jts #
             ) 
             dist_object_pc_nearest_pcs, _ = torch.min(dist_object_pc_nearest_pcs, dim=-1) # ws x nn_obj #
@@ -2422,7 +2184,7 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             base_pts_global_orient_mtx = object_global_orient_mtx_th # ws x 3 x 3 #
             base_pts_transl = object_trcansl_th # ws x 3 # 
             base_pts = torch.matmul(
-                (base_pts - base_pts_transl.unsqueeze(1)), base_pts_global_orient_mtx.transpose(1, 2) # ws x nn_base_pts x 3 --> ws x nn_base_pts x 3 #
+                (base_pts - base_pts_transl.unsqueeze(1)), base_pts_global_orient_mtx.transpose(1, 2) 
             )
             base_normals = torch.matmul(
                 base_normals, base_pts_global_orient_mtx.transpose(1, 2)  # ws x nn_base_pts x 3 
@@ -2455,104 +2217,24 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             )
         
         if self.predicted_hand_joints is not None:
-            # self.predicted_hand_trans = torch.from_numpy(self.predicted_hand_trans).float() # nframes x 3 
-            # self.predicted_hand_rot = torch.from_numpy(self.predicted_hand_rot).float() # nframes x 3 
-            # self.predicted_hand_theta = torch.from_numpy(self.predicted_hand_theta).float() # nframes x 24 
-            # self.predicted_hand_beta = torch.from_numpy(self.predicted_hand_beta).float() # 10,
             pert_rhand_joints = self.predicted_hand_joints
-            # rhand_transl_var, rhand_global_orient_var, rhand_pose_var, rhand_beta_var
             if self.predicted_hand_trans is not None:
                 rhand_transl_var = self.predicted_hand_trans
                 rhand_global_orient_var = self.predicted_hand_rot
                 rhand_pose_var = self.predicted_hand_theta
                 print(f"rhand_beta_var: {self.predicted_hand_beta.size()}")
-                rhand_beta_var = self.predicted_hand_beta #.unsqueeze(0)
+                rhand_beta_var = self.predicted_hand_beta
         
-        ''' normalization strategy xxx --- data scaling '''
-        # base_pts = base_pts * 5.
-        # rhand_joints = rhand_joints * 5.
-        ''' Normlization stratey xxx --- data scaling '''
-        
-        
-        
-        # ''' GET ambinet space base pts '''
-        # # normalized #
-        # # rhand_joints: nf x nnj x 3
-        # # base_pts: nnb x 3 ## --> (nf x nnj + nnb) x 3 #
-        # tot_pts = torch.cat(
-        #     [rhand_joints.view(rhand_joints.size(0) * rhand_joints.size(1), 3), base_pts], dim=0
-        # )
-        # maxx_tot_pts, _ = torch.max(tot_pts, dim=0) ## 3
-        # minn_tot_pts, _ = torch.min(tot_pts, dim=0) ## 3
-        # # uniformly sample rand
-        # # rand(0, 1)? # 0 and 1 
-        # xyz_coords_coeffs = torch.rand((nn_base_pts, 3)) ## nn_base_pts x 3 #
-        # # nn_base_pts x 3 #
-        # sampled_base_pts = minn_tot_pts.unsqueeze(0) + xyz_coords_coeffs * (maxx_tot_pts - minn_tot_pts).unsqueeze(0)
-        # # to object_pc
-        # # nn_base_pts x nn_obj_pc # ---> nf x nnb x nn_obj
-        # dist_sampled_base_pts_to_obj_pc = torch.sum(
-        #     (sampled_base_pts.unsqueeze(0).unsqueeze(2) - object_pc_th.unsqueeze(1)) ** 2, dim=-1
-        # )
-        # # nf x nnb; nf x nnb #
-        # minn_dist_sampled_base_to_obj, minn_dist_idxes = torch.min(
-        #     dist_sampled_base_pts_to_obj_pc, dim=-1
-        # )
-        
-        # ## sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns ##
-        # ## sampled_base_pts, sampled_base_pts_nearest_obj_pc, sampled_base_pts_nearest_obj_vns #
-        # # TODO: should compare between raw pts and raltive positions to nearest obj pts #
-        # # sampled_base...: nf x nnb x 3 #
-        # sampled_base_pts_nearest_obj_pc = utils.batched_index_select_ours(
-        #     values=object_pc_th, indices=minn_dist_idxes, dim=1
-        # )
-        # # sampled...: nf x nnb x 3 #
-        # sampled_base_pts_nearest_obj_vns = utils.batched_index_select_ours(
-        #     values=object_normal_th, indices=minn_dist_idxes, dim=1
-        # )
-        
-        # # base pts single values, nearest object pc and nearest object normal #
-        ''' GET ambinet space base pts '''
-        
-        
-        # base_pts = sampled_base_pts
-        # sampled_base_pts = base_pts
-        
-        ''' Relative positions and distances normalization, strategy 1 '''
-        # rhand_joints = rhand_joints * 5.
-        # base_pts = base_pts * 5.
-        ''' Relative positions and distances normalization, strategy 1 '''
-        # sampled_base_pts: nn_base_pts x 3 #
-        # nf x nnj x nnb x 3 #
-        # nf x nnj x nnb x 3 #
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - sampled_base_pts.unsqueeze(0).unsqueeze(0)
-        # # # dist_base_pts_to...: ws x nn_joints x nn_sampling #
-        # dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
         
         if not self.args.use_arti_obj:
             # nf x nnj x nnb x 3 # 
             rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-            # # dist_base_pts_to...: ws x nn_joints x nn_sampling # ### dit bae tps to rhand joints ###
             dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
         else:
-            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(1) # ws x nn_joints x nn_base_pts x 3 #
-            # dist_base_pts_to_rhand_joints: ws x nn_joints x nn_base_pts -> the distance from base points to joint points #
+            rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(1)
             dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(1) * rel_base_pts_to_rhand_joints, dim=-1)
         
-        # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
         
-        
-        # # nf x nnj x nnb x 3 # 
-        # rel_base_pts_to_rhand_joints = pert_rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        
-        # # rel_base_pts_to_rhand_joints = rhand_joints.unsqueeze(2) - base_pts.unsqueeze(0).unsqueeze(0)
-        
-        # # # dist_base_pts_to...: ws x nn_joints x nn_sampling # ### dit bae tps to rhand joints ###
-        # dist_base_pts_to_rhand_joints = torch.sum(base_normals.unsqueeze(0).unsqueeze(0) * rel_base_pts_to_rhand_joints, dim=-1)
-        
-        
-        # k of the # # nf x nnj x nnb # # nnj x nnb # nnb -> 
-        ## TODO: other choices of k_f? ##
         k_f = 1.
         # relative #
         l2_rel_base_pts_to_rhand_joints = torch.norm(rel_base_pts_to_rhand_joints, dim=-1)
@@ -2583,48 +2265,23 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             )
             # unsqueeze the dimensiton 1 #
             rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals[:-1].unsqueeze(1)
-        # nf x nnj x nnb x 3 --> rel_vt_normals ## nf x nnj x nnb
-        # # (ws - 1) x nnj x nnb # # (ws - 1) x nnj x 3 --> 
-        
-        # # rhand_joints_disp = rhand_joints[1:, :, :] - rhand_joints[:-1, :, :]
-        # # 
-        # # distance -- base_normalss,; (ws - 1) x nnj x nnb x 3 -
-        # signed_dist_base_pts_to_rhand_joints_along_normal = torch.sum(
-        #     base_normals.unsqueeze(0).unsqueeze(0) * rhand_joints_disp.unsqueeze(2), dim=-1
-        # )
-        # # nf x nnj x nnb x 3 --> rel_vt_normals ## nf x nnj x nnb
-        # # # (ws - 1) x nnj x nnb # # (ws - 1) x nnj x 3 --> 
-        # # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
-        # rel_base_pts_to_rhand_joints_vt_normal = rhand_joints_disp.unsqueeze(2) - signed_dist_base_pts_to_rhand_joints_along_normal.unsqueeze(-1) * base_normals.unsqueeze(0).unsqueeze(0)
-        # nf x nnj x nnb ---> dist_vt_normals -> nf x nnj x nnb # # torch.sqrt() ##
+
+
         dist_base_pts_to_rhand_joints_vt_normal = torch.sqrt(torch.sum(
             rel_base_pts_to_rhand_joints_vt_normal ** 2, dim=-1
         ))
         
         k_a = 1.
         k_b = 1.
-        # k and # give me a noised sequence ... #
-        # (ws - 1) x nnj x nnb # --> (ws - 1) x nnj x nnb # nnj x nnb # 
-        # add noise -> chagne of the joints displacements 
-        # -> change of along_normalss energies and vertical to normals energies #
-        # -> change of energy taken to make the displacements #
-        # jts_to_base_pts energy in the noisy sequence #
-        # jts_to_base_pts energy in the clean sequence #
-        # vt-normal, along_normal #
-        # TODO: the normalization strategy: 1) per-instnace; 2) per-category; #3
-        # att_forces: (ws - 1) x nnj x nnb # # 
+        
+        
         e_disp_rel_to_base_along_normals = k_a * att_forces * torch.abs(signed_dist_base_pts_to_rhand_joints_along_normal)
         # (ws - 1) x nnj x nnb # -> dist vt normals #
         e_disp_rel_to_baes_vt_normals = k_b * att_forces * dist_base_pts_to_rhand_joints_vt_normal
         # base_pts; base_normals; 
         
         
-        ''' normalization sstrategy 1 ''' # 
-        # per_frame_avg_disp_along_normals, per_frame_std_disp_along_normals # 
-        # per_frame_avg_disp_vt_normals, per_frame_std_disp_vt_normals #
-        # e_disp_rel_to_base_along_normals, e_disp_rel_to_baes_vt_normals #
-        # per_frame_avg_disp_along_normalss, per_frame_std_disp_along_normalss # 
-        # rel_base_pts_to_rhand_joints_vt_normal -> disp_ws x nnj x nnb x 3 #
+        ''' normalization sstrategy 1 ''' 
         disp_ws, nnj, nnb = e_disp_rel_to_base_along_normals.shape[:3]
         # disp_ws x nnf x nnb x 3 #  -> disp_ws x nnj x nnb
         per_frame_avg_disp_along_normals = torch.mean( # avg over all frmaes #
@@ -2638,18 +2295,11 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         ) # .unsqueeze(0)
         per_frame_std_disp_vt_normals = torch.std( # std over all frames #
             e_disp_rel_to_baes_vt_normals.view(disp_ws, nnj, nnb), dim=0, keepdim=True
-        ) # .unsqueeze(0)
-        # per_frame_avg_joints_dists_rel = torch.mean(
-        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-        # ).unsqueeze(0)
-        # per_frame_std_joints_dists_rel = torch.std(
-        #     dist_base_pts_to_rhand_joints.view(ws * nnf, nnb), dim=0, keepdim=True
-        # ).unsqueeze(0)
-        ### normalizaed aong normals and vat normals  # ws x nnj x nnb 
+        )
+        
         e_disp_rel_to_base_along_normals = (e_disp_rel_to_base_along_normals - per_frame_avg_disp_along_normals) / per_frame_std_disp_along_normals
         e_disp_rel_to_baes_vt_normals = (e_disp_rel_to_baes_vt_normals - per_frame_avg_disp_vt_normals) / per_frame_std_disp_vt_normals
-        # enrgy temrs #
-        ''' normalization sstrategy 1 ''' # 
+        ''' normalization sstrategy 1 '''
         
         
         
@@ -2776,33 +2426,24 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             'per_frame_std_disp_vt_normals': per_frame_std_disp_vt_normals,
             'e_disp_rel_to_base_along_normals': e_disp_rel_to_base_along_normals,
             'e_disp_rel_to_baes_vt_normals': e_disp_rel_to_baes_vt_normals, # 
-            # # obj_verts, obj_faces
-            # 'obj_verts': torch.from_numpy(cur_obj_verts).float(), # nn_verts x 3 #
-            # 'obj_faces': torch.from_numpy(cur_obj_faces).long(), # nn_faces x 3 
         }
         # obj_verts, obj_faces
         if len(self.corr_fn) > 0:
             rt_dict.update(
                 {
-                    # 'obj_verts': torch.from_numpy(cur_obj_verts).float(), # nn_verts x 3 #
-                    # 'obj_faces': torch.from_numpy(cur_obj_faces).long(), # nn_faces x 3 
                     'obj_verts': tot_full_obj_verts, # nn_verts x 3 #
                     'obj_faces': torch.from_numpy(tot_full_obj_faces).long(), # nn_faces x 3 
                 }
-                # tot_full_obj_verts, tot_full_obj_faces
             )
         if self.args.select_part_idx != -1:
             rt_dict.update(
                 {
-                    # 'obj_verts': torch.from_numpy(cur_obj_verts).float(), # nn_verts x 3 #
-                    # 'obj_faces': torch.from_numpy(cur_obj_faces).long(), # nn_faces x 3 
                     'obj_verts': tot_full_obj_verts, # nn_verts x 3 #
                     'obj_faces': torch.from_numpy(tot_full_obj_faces).long(), # nn_faces x 3 
                 }
-                # tot_full_obj_verts, tot_full_obj_faces
             )
         
-        if self.use_anchors: ## update rhand anchors here ##
+        if self.use_anchors:
             rt_dict.update(
                 {
                     'rhand_anchors': rhand_anchors,
@@ -2811,7 +2452,6 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
             )
         
         try:
-            # rt_dict['per_frame_avg_joints_rel'] = 
             rt_dict.update(stats_dict)
         except:
             pass
@@ -2820,26 +2460,13 @@ class GRAB_Dataset_V19_HOI4D(torch.utils.data.Dataset):
         return rt_dict
 
 
-        # if self.dir_stra == 'rot_angles':
-        #     # tangent_orient_vec # nn_base_pts x 3 #
-        #     rt_dict['base_tangent_orient_vec'] = tangent_orient_vec.numpy() #
-        
-        rt_dict_th = {
-            k: torch.from_numpy(rt_dict[k]).float() if not isinstance(rt_dict[k], torch.Tensor) else rt_dict[k] for k in rt_dict 
-        }
-        # rt_dict
-
-        return rt_dict_th
-        # return np.concatenate([window_feat, corr_mask_gt, corr_pts_gt, corr_dist_gt, rel_pos_object_pc_joint_gt, dec_cond, rhand_feats_exp], axis=2)
-
     def __len__(self):
         cur_len = self.len // self.step_size
         if cur_len * self.step_size < self.len:
           cur_len += 1
         cur_len = 1
         return cur_len
-        # return ceil(self.len / self.step_size)
-        # return self.len
+
 
 
 # ARCTIC #
