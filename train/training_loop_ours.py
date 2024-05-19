@@ -26,7 +26,7 @@ from data_loaders.get_data import get_dataset_loader
 ## intial log loss scale ##
 INITIAL_LOG_LOSS_SCALE = 20.0
 
-# do not #
+
 class TrainLoop:
     def __init__(self, args, train_platform, model, diffusion, data):
         self.args = args
@@ -40,33 +40,34 @@ class TrainLoop:
             self.cond_mode = model.cond_mode
         self.data = data
         self.batch_size = args.batch_size
-        self.microbatch = args.batch_size  # deprecating this option
+        self.microbatch = args.batch_size
         self.lr = args.lr
         self.log_interval = args.log_interval
         self.save_interval = args.save_interval
         self.resume_checkpoint = args.resume_checkpoint
-        self.use_fp16 = False  # deprecating this option
-        self.fp16_scale_growth = 1e-3  # deprecating this option
+        self.use_fp16 = False  
+        self.fp16_scale_growth = 1e-3
         self.weight_decay = args.weight_decay
         self.lr_anneal_steps = args.lr_anneal_steps
+        #### getting related configs ####
 
         self.step = 0
         # self.resume_step = 0
         self.resume_step = False
-        self.global_batch = self.batch_size # * dist.get_world_size()
+        self.global_batch = self.batch_size
         self.num_steps = args.num_steps
         self.num_epochs = self.num_steps // len(self.data) + 1
 
         self.sync_cuda = torch.cuda.is_available()
 
-        if self.args.finetune_with_cond: # finetune_with_cond -> 
-            self._load_and_sync_parameters_cond() # load parameters here 
+        if self.args.finetune_with_cond: 
+            self._load_and_sync_parameters_cond() 
             print(f"Setting trans linear layer to zero for conditioning...")
-            self.model.set_trans_linear_layer_to_zero() # 
+            self.model.set_trans_linear_layer_to_zero()
         else: # finetune_with_cond
             self._load_and_sync_parameters()
         
-        self.mp_trainer = MixedPrecisionTrainer( # mixed 
+        self.mp_trainer = MixedPrecisionTrainer(
             model=self.model, # 
             use_fp16=self.use_fp16,
             fp16_scale_growth=self.fp16_scale_growth,
@@ -133,7 +134,7 @@ class TrainLoop:
         model_dict.update(part_dict)
         model.load_state_dict(model_dict)
         print(f"Resume glb-backbone finished!! Total number of parameters: {tot_params_n}.")
-        #
+
 
     def _load_and_sync_parameters_cond(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -145,14 +146,12 @@ class TrainLoop:
                                 resume_checkpoint, map_location=dist_util.dev()
                             )
             if self.args.diff_basejtsrel:
-                # if self.args.finetune_with_cond_rel:
                 model_dict = self.model.state_dict()
-                # elif self.args.finetune_with_cond_jtsobj:
                     
                 model_dict.update(state_dicts)
                 self.model.load_state_dict(model_dict)
                 
-                if self.args.finetune_with_cond_jtsobj: # finetune_with_cond_jtsobj --> finetune_with_cond_jtsobj
+                if self.args.finetune_with_cond_jtsobj:
                     # cond_joints_offset_input_process <- joints_offset_input_process; cond_sequence_pos_encoder <- sequence_pos_encoder; cond_seqTransEncoder <- seqTransEncoder
                     self.model.cond_joints_offset_input_process.load_state_dict(self.model.joints_offset_input_process.state_dict())
                     self.model.cond_sequence_pos_encoder.load_state_dict(self.model.sequence_pos_encoder.state_dict())
@@ -160,12 +159,6 @@ class TrainLoop:
                 
             else:
                 raise ValueError(f"Must have diff_basejtsrel setting, others not implemented yet!")
-            
-            # self.safe_load_ckpt(self.model, 
-            #                         dist_util.load_state_dict(
-            #                             resume_checkpoint, map_location=dist_util.dev()
-            #                         )
-            #                     )
 
     def _load_and_sync_parameters(self):
         resume_checkpoint = find_resume_checkpoint() or self.resume_checkpoint
@@ -202,17 +195,11 @@ class TrainLoop:
         for epoch in range(self.num_epochs):
             print(f'Starting epoch {epoch}')
             for batch in tqdm(self.data):
-            # for motion, cond in tqdm(self.data): ## motion; cond; data ##
                 if not (not self.lr_anneal_steps or self.step + self.resume_step < self.lr_anneal_steps):
                     break
-                # print(f"motion: {motion.size()}, ") ## motion.to(self.device)
-                # motion = motion.to(self.device)
-                # cond['y'] = {key: val.to(self.device) if torch.is_tensor(val) else val for key, val in cond['y'].items()}
-                
-                # batch = {
-                #   key: val.to(self.device) if torch.is_tensor(val) else ([subval.to(self.device) for subval in val] if isinstance(val, list) else val) for key, val in batch.items()
-                # }
-                for k in batch:
+
+
+                for k in batch: 
                     if isinstance(batch[k], torch.Tensor):
                         batch[k] = batch[k].to(self.device)
                     elif isinstance(batch[k], list):
@@ -220,10 +207,9 @@ class TrainLoop:
                     else:
                         batch[k] = batch[k]
                 
-                ## run current motion and cond ##
-                ## run step ##
-                self.run_step(batch) ## run step for the motion and cond ##
-                ## ===== log useful things ==== ##
+                
+                self.run_step(batch)
+                
                 if self.step % self.log_interval == 0: # 
                     loss_dict = logger.get_current().name2val
                     print('step[{}]: loss[{:0.5f}]'.format(self.step+self.resume_step, loss_dict["loss"]))
@@ -236,17 +222,9 @@ class TrainLoop:
                             continue
                         else:
                             self.train_platform.report_scalar(name=k, value=v, iteration=self.step, group_name='Loss')
-                    # for k,v in logger.get_current().name2val.items():
-                    #     if k == 'loss':
-                    #         print('step[{}]: loss[{:0.5f}]'.format(self.step+self.resume_step, v))
 
-                    #     if k in ['step', 'samples'] or '_q' in k: # step samples #
-                    #         continue
-                    #     else:
-                    #         self.train_platform.report_scalar(name=k, value=v, iteration=self.step, group_name='Loss')
-                ## ===== save checkpoints ===== ##
+
                 if self.step % self.save_interval == 0:
-                    ## save; model.eval;
                     self.save()
                     if self.args.nprocs > 1:
                         self.model.module.eval()
@@ -323,34 +301,12 @@ class TrainLoop:
             assert i == 0
             assert self.microbatch == self.batch_size
             micro = batch
-            # micro_cond = cond
+            # micro_cond = cond # 
             ## micro-batch # base_pts; base_pts #
             last_batch = (i + self.microbatch) >= batch['base_pts'].shape[0]
             t, weights = self.schedule_sampler.sample(micro['base_pts'].shape[0], dist_util.dev())
 
-            # print(f"t: {t.size()}, weights: {weights.size()}, t_device: {t.device}, weights_device: {weights.device}")
-            # compute_losses = functools.partial(
-            #     self.diffusion.training_losses,
-            #     self.ddp_model,
-            #     micro,  # [bs, ch, image_size, image_size]
-            #     t,  # [bs](int) sampled timesteps
-            #     model_kwargs={'y': batch}, # 
-            #     dataset=self.data.dataset
-            # )
-            
-            # # if last_batch or not self.use_ddp:
-            # #     losses = compute_losses() ## compute lossses
-            # # else:
-            # #     with self.ddp_model.no_sync():
-            # #         losses = compute_losses()
-                    
-            # if  not self.use_ddp:
-            #     losses = compute_losses() ## compute lossses
-            # else:
-            #     with self.ddp_model.no_sync():
-            #         losses = compute_losses()
-            
-            ### training losses ###
+
             losses = self.diffusion.training_losses(
                 self.ddp_model,
                 micro,  # [bs, ch, image_size, image_size]
@@ -365,12 +321,12 @@ class TrainLoop:
                     t, losses["loss"].detach()
                 )
             
-            # print(losses["loss"].size(), f"weights: {weights.size()}")
+            
             loss = (losses["loss"] * weights).mean()
             
             if self.args.nprocs > 1:
                 torch.distributed.barrier()
-                dist_util.reduce_mean(loss, self.args.nprocs) ## args nprocs ##
+                dist_util.reduce_mean(loss, self.args.nprocs)
                 
             
             log_loss_dict(
