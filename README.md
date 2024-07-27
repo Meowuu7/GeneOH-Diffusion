@@ -36,8 +36,11 @@ conda activate geneoh-diffusion
 ```
 
 Install `torch2.2.0+cu121`
-```shell
+<!-- ```shell
 pip3 install torch torchvision torchaudio
+``` -->
+```shell
+pip install torch==2.2.0 torchvision==0.17.0 torchaudio==2.2.0 --index-url https://download.pytorch.org/whl/cu121
 ```
 
 Install `torch_cluster`
