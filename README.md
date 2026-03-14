@@ -407,7 +407,7 @@ If you find this code useful in your research, please cite:
 ## Acknowledgments
 
 This code is standing on the shoulders of giants. We want to thank the following contributors
-that our code is based on: [motion-diffusion-model](https://github.com/GuyTevet/motion-diffusion-model) and [guided-diffusion](https://github.com/openai/guided-diffusion).
+that our code is based on: [motion-diffusion-model](https://github.com/GuyTevet/motion-diffusion-model), [guided-diffusion](https://github.com/openai/guided-diffusion), [TOCH](https://github.com/kzhou23/toch), and [ARCTIC](https://github.com/zc-alexfan/arctic). 
 
 ## License
 This code is distributed under an [MIT LICENSE](LICENSE).
